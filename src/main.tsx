@@ -5,6 +5,12 @@ import '@fontsource-variable/inter';
 import './styles.css';
 import App from './App';
 
+// Free deed.page hosting shows a small badge in the bottom-right corner.
+// Mark the host so the tab bar can sit above it instead of underneath.
+if (window.location.hostname.endsWith('.deed.page')) {
+  document.documentElement.dataset.host = 'deed';
+}
+
 const root = document.getElementById('root');
 if (root) {
   createRoot(root).render(

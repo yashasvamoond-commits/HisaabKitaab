@@ -1,0 +1,69 @@
+name: Publish permanent app link
+
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: 'Public link name (letters, numbers, hyphen)'
+        required: true
+        default: 'hisaabkitaab-app'
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  SLUG: ${{ inputs.slug || 'hisaabkitaab-app' }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Check size
+        run: |
+          BYTES=$(du -sb dist | cut -f1)
+          echo "dist is $BYTES bytes"
+          test "$BYTES" -lt 25000000
+      - name: Restore publish token
+        uses: actions/cache@v4
+        with:
+          path: ~/.config/deed-page
+          key: deed-page-token-v1
+      - name: Publish to deed.page
+        run: |
+          curl -fsSL https://deed.page/cli/publish-large.mjs -o publish-large.mjs
+          node publish-large.mjs ./dist --slug "$SLUG" --client "Arena Agent" | tee publish-url.txt
+          URL=$(tail -n 1 publish-url.txt)
+          echo "::notice title=HisaabKitaab live link::$URL"
+          for path in "" "manifest.json" "sw.js" "index.html" "ocr/core/tesseract-core-simd-lstm.wasm" "ocr/lang/eng.traineddata.gz"; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "${URL}${path}")
+            echo "::notice title=Check /${path}::${STATUS}"
+          done
+      - name: Verify installability
+        continue-on-error: true
+        run: |
+          URL=$(tail -n 1 publish-url.txt)
+          npm i --no-save --no-package-lock puppeteer-core
+          node scripts/check-pwa.mjs "$URL" > check.json
+          node scripts/report-pwa.mjs check.json
+      - name: Live OCR + save check
+        continue-on-error: true
+        run: |
+          URL=$(tail -n 1 publish-url.txt)
+          node scripts/check-live-ocr.mjs "$URL" > live.json || true
+          node scripts/report-live.mjs live.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pwa-check
+          path: /tmp/pwa-check.png
+          if-no-files-found: ignore
+
+# publish trigger: host-aware tab bar + badge check

@@ -3682,3 +3682,22 @@ input[type='date'].field-input {
     transition-duration: 0.001ms !important;
   }
 }
+
+
+/* ==================================================================
+   deed.page free hosting: its small badge sits in the bottom-right
+   corner. Lift the tab bar and fixed CTAs so nothing overlaps it.
+   ================================================================== */
+@media (max-width: 879px) {
+  html[data-host='deed'] .tabbar {
+    bottom: 40px;
+  }
+
+  html[data-host='deed'] .app-main.has-tabbar {
+    padding-bottom: calc(var(--tabbar-h) + 66px + env(safe-area-inset-bottom, 0px));
+  }
+
+  html[data-host='deed'] .review-cta {
+    bottom: calc(var(--tabbar-h) + 52px + env(safe-area-inset-bottom, 0px));
+  }
+}
