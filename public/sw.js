@@ -11,7 +11,7 @@ self.addEventListener('install', (event) => {
     caches
       .open(SHELL)
       .then((cache) =>
-        cache.addAll([scopeUrl('./'), scopeUrl('index.html'), scopeUrl('manifest.webmanifest'), scopeUrl('icons/icon-192.png'), scopeUrl('icons/icon-512.png')]),
+        cache.addAll([scopeUrl('./'), scopeUrl('index.html'), scopeUrl('manifest.json'), scopeUrl('icons/icon-192.png'), scopeUrl('icons/icon-512.png')]),
       )
       .catch(() => undefined)
       .then(() => self.skipWaiting()),

@@ -140,7 +140,7 @@ src/
   components/     # avatars, sheets, person picker, rows, icons
   pages/          # Home, Scan (smart add), Person, People, Activity, Settings, Onboarding
 public/
-  manifest.webmanifest
+  manifest.json
   sw.js           # offline shell + share-target handler
   icons/
 scripts/          # OCR asset prep, icon generation, parser tests
