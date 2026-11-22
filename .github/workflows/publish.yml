@@ -59,6 +59,12 @@ jobs:
           npm i --no-save --no-package-lock puppeteer-core
           node scripts/check-pwa.mjs "$URL" > check.json
           node scripts/report-pwa.mjs check.json
+      - name: Live OCR + save check
+        continue-on-error: true
+        run: |
+          URL=$(tail -n 1 publish-url.txt)
+          node scripts/check-live-ocr.mjs "$URL" > live.json || true
+          node scripts/report-live.mjs live.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -67,3 +73,5 @@ jobs:
           if-no-files-found: ignore
 
 # publish trigger: host-aware tab bar + badge check
+
+# publish trigger: live OCR verification
