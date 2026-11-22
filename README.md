@@ -7,12 +7,12 @@ HisaabKitaab keeps everyday shared spending straight: who paid, who owes, and wh
 It installs from a link and works on iPhone, Android and the web.
 
 <p align="center">
-  <a href="https://hisaabkitaab-app.deed.page/"><img src="docs/install-qr.png" width="140" alt="QR code for the HisaabKitaab app" /></a>
+  <a href="https://hisaabkitaab-app-2.deed.page/"><img src="docs/install-qr.png" width="140" alt="QR code for the HisaabKitaab app" /></a>
 </p>
 
 ### Open the app
 
-**<https://hisaabkitaab-app.deed.page/>**
+**<https://hisaabkitaab-app-2.deed.page/>**
 
 <p align="center">
   <img src="docs/screens/home.png" width="240" alt="Home: total balance, people and recent activity" />

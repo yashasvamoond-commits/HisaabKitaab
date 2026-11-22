@@ -1,11 +1,6 @@
 name: Publish permanent app link
 
 on:
-  push:
-    branches:
-      - arena/246c4b92-hisaabkitaab
-    paths:
-      - .github/workflows/publish.yml
   workflow_dispatch:
     inputs:
       slug:
@@ -41,10 +36,6 @@ jobs:
         with:
           path: ~/.config/deed-page
           key: deed-page-token-v1
-      - name: Check publish token
-        run: |
-          FILES=$(find ~/.config/deed-page -type f 2>/dev/null | wc -l | tr -d ' ')
-          echo "::notice title=Publish token::${FILES} file(s) restored"
       - name: Publish to deed.page
         run: |
           curl -fsSL https://deed.page/cli/publish-large.mjs -o publish-large.mjs
