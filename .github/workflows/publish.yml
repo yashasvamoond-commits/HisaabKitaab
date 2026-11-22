@@ -11,14 +11,14 @@ on:
       slug:
         description: 'Public link name (letters, numbers, hyphen)'
         required: true
-        default: 'hisaabkitaab-app'
+        default: 'hisaabkitaab-app-2'
         type: string
 
 permissions:
   contents: read
 
 env:
-  SLUG: ${{ inputs.slug || 'hisaabkitaab-app' }}
+  SLUG: ${{ inputs.slug || 'hisaabkitaab-app-2' }}
 
 jobs:
   publish:
