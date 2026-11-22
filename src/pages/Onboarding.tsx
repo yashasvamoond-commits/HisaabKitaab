@@ -1,106 +1,107 @@
 import { useState } from 'react';
 import { useApp } from '../lib/store';
 import { assetUrl } from '../lib/assets';
-import { CheckIcon, ShieldIcon, SparkleIcon, WhatsAppIcon } from '../components/Icons';
+import { CheckIcon, ImageIcon, ShieldIcon, UsersIcon } from '../components/Icons';
 
 export function OnboardingPage() {
   const { finishOnboarding, loadSample, toast } = useApp();
   const [name, setName] = useState('');
+  const valid = name.trim().length >= 2;
 
   return (
     <div className="onboarding">
-      <div className="onboarding-glow" aria-hidden="true" />
       <header className="onboarding-brand">
-        <img src={assetUrl('icons/icon-192.png')} alt="" width={44} height={44} />
+        <img src={assetUrl('icons/icon-192.png')} alt="" width={40} height={40} />
         <span>HisaabKitaab</span>
       </header>
 
       <div className="onboarding-hero">
-        <span className="onboarding-eyebrow">
-          <SparkleIcon size={14} /> Screenshot se hisaab
-        </span>
         <h1>
-          Apna hisaab,
+          Shared expenses,
           <br />
-          apni <span className="accent">zubaani</span>
+          settled simply.
         </h1>
-        <p className="onboarding-hindi">अपना हिसाब, अपनी ज़ुबानी</p>
-        <p className="onboarding-lede">
-          Doston, family aur dukaandaar ke saath paise ka hisaab. Screenshot ya chat bhejo — naam, amount aur kisne
-          diya, sab khud samajh jaata hai.
-        </p>
+        <p>Track who paid, who owes, and settle up — without the awkward math.</p>
       </div>
 
       <div className="onboarding-art" aria-hidden="true">
         <span className="art-phone">
-          <span className="art-top">GPay</span>
+          <span className="art-top">
+            <span className="art-dot" /> PhonePe
+          </span>
           <span className="art-amount">₹250</span>
-          <span className="art-to">To Rahul Sharma</span>
+          <span className="art-to">Paid to Rahul Sharma</span>
           <span className="art-row">
             <CheckIcon size={13} /> Payment successful
           </span>
         </span>
-        <span className="art-chip art-chip--top">
-          <span className="art-dot" /> Rahul ka khata
-        </span>
+        <span className="art-chip art-chip--top">Rahul owes you ₹250</span>
         <span className="art-chip art-chip--bottom">
           <span className="art-tick">
             <CheckIcon size={12} />
           </span>
-          Purane hisaab mein add
+          Added to history
         </span>
       </div>
 
       <div className="onboarding-features">
         <div>
-          <CheckIcon size={16} /> Screenshot, SMS aur WhatsApp — sab chalta hai
+          <span className="feature-icon">
+            <ImageIcon size={17} />
+          </span>
+          <p>Reads UPI screenshots and bank messages</p>
         </div>
         <div>
-          <CheckIcon size={16} /> Naya banda? Khata khud ban jaata hai
+          <span className="feature-icon">
+            <UsersIcon size={17} />
+          </span>
+          <p>Keeps every balance up to date</p>
         </div>
         <div>
-          <CheckIcon size={16} /> Offline, bina login, data aapke phone mein
+          <span className="feature-icon">
+            <ShieldIcon size={17} />
+          </span>
+          <p>Works offline. Your data stays on your phone.</p>
         </div>
       </div>
 
       <div className="onboarding-form">
-        <label htmlFor="onboarding-name">Aapka naam?</label>
+        <label htmlFor="onboarding-name">What should we call you?</label>
         <input
           id="onboarding-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Jaise: Yashasva"
+          placeholder="Your name"
           maxLength={40}
           autoComplete="given-name"
           enterKeyHint="done"
           onKeyDown={(e) => {
-            if (e.key === 'Enter') finishOnboarding(name);
+            if (e.key === 'Enter' && valid) finishOnboarding(name);
           }}
         />
-        <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => finishOnboarding(name)}>
-          Shuru karo
+        <p className="onboarding-note">Used to recognise payments made to you. You can change it later.</p>
+        <button
+          type="button"
+          className="btn btn-primary btn-block btn-lg"
+          onClick={() => finishOnboarding(name)}
+          disabled={!valid}
+        >
+          Get started
         </button>
         <button
           type="button"
           className="link-quiet"
           onClick={() => {
-            finishOnboarding(name || 'Aap');
+            finishOnboarding(name || 'You');
             loadSample();
-            toast('Sample hisaab load ho gaya — apna data baad mein daalna');
+            toast('Sample data loaded');
           }}
         >
-          Pehle sample hisaab dekho
+          Explore with sample data
         </button>
       </div>
 
-      <footer className="onboarding-foot">
-        <span>
-          <ShieldIcon size={14} /> Free · No login · Made in India
-        </span>
-        <span>
-          <WhatsAppIcon size={13} /> Polite reminders
-        </span>
-      </footer>
+      <footer className="onboarding-foot">No login · Free · Works offline</footer>
     </div>
   );
 }

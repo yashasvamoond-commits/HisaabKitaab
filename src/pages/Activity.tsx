@@ -3,7 +3,9 @@ import { useApp } from '../lib/store';
 import { groupByDay, monthTotals } from '../lib/calc';
 import { MONTHS_FULL, dayLabel, rupees } from '../lib/format';
 import { navigate } from '../lib/router';
+import type { Txn } from '../lib/types';
 import { TxnRow } from '../components/TxnRow';
+import { TxnSheet } from '../components/TxnSheet';
 import { EmptyState, Segmented } from '../components/ui';
 import { BookIcon } from '../components/Icons';
 
@@ -12,23 +14,25 @@ type Filter = 'all' | 'out' | 'in';
 export function ActivityPage() {
   const { txns, persons } = useApp();
   const [filter, setFilter] = useState<Filter>('all');
+  const [activeTxn, setActiveTxn] = useState<Txn | null>(null);
 
   const filtered = useMemo(() => {
     if (filter === 'all') return txns;
-    return txns.filter((t) => t.direction === filter && !t.settlement);
+    return txns.filter((t) => t.direction === filter);
   }, [txns, filter]);
 
   const groups = useMemo(() => groupByDay(filtered), [filtered]);
   const month = monthTotals(txns);
+  const net = month.given - month.taken;
   const now = new Date();
-  const personName = (id: string) => persons.find((p) => p.id === id)?.name || 'Puraana banda';
+  const personName = (id: string) => persons.find((p) => p.id === id)?.name || 'Unknown';
 
   return (
     <div className="page">
-      <header className="topbar">
+      <header className="page-head">
         <div>
-          <h1 className="page-title">Kitaab</h1>
-          <p className="page-sub">Poora hisaab, ek jagah</p>
+          <h1 className="page-title">Activity</h1>
+          <p className="page-sub">Every expense and payment</p>
         </div>
       </header>
 
@@ -37,23 +41,25 @@ export function ActivityPage() {
           <span>
             {MONTHS_FULL[now.getMonth()]} {now.getFullYear()}
           </span>
-          <span className="month-count">{txns.length} {txns.length === 1 ? 'entry' : 'entries'}</span>
+          <span className="month-count">
+            {txns.length} {txns.length === 1 ? 'entry' : 'entries'}
+          </span>
         </div>
         <div className="month-grid">
           <div>
-            <span className="month-label">Diye</span>
-            <strong className="is-out">{rupees(month.given)}</strong>
+            <span className="month-label">You paid</span>
+            <strong>{rupees(month.given)}</strong>
           </div>
           <div>
-            <span className="month-label">Liye</span>
-            <strong className="is-in">{rupees(month.taken)}</strong>
+            <span className="month-label">They paid</span>
+            <strong>{rupees(month.taken)}</strong>
           </div>
           <div>
             <span className="month-label">Net</span>
-            <strong className={month.given - month.taken >= 0 ? 'is-out' : 'is-in'}>
-              {month.given === month.taken
+            <strong className={net > 0.009 ? 'is-pos' : net < -0.009 ? 'is-neg' : ''}>
+              {Math.abs(net) < 0.009
                 ? '₹0'
-                : `${month.given > month.taken ? '+' : '−'}${rupees(Math.abs(month.given - month.taken))}`}
+                : `${net > 0 ? '+' : '−'}${rupees(Math.abs(net))}`}
             </strong>
           </div>
         </div>
@@ -62,11 +68,11 @@ export function ActivityPage() {
       <Segmented
         value={filter}
         onChange={setFilter}
-        ariaLabel="Hisaab filter"
+        ariaLabel="Filter activity"
         options={[
-          { value: 'all', label: 'Sab' },
-          { value: 'out', label: 'Maine diye' },
-          { value: 'in', label: 'Unhone diye' },
+          { value: 'all', label: 'All' },
+          { value: 'out', label: 'You paid' },
+          { value: 'in', label: 'They paid' },
         ]}
       />
 
@@ -76,22 +82,16 @@ export function ActivityPage() {
             <section key={g.key} className="timeline-group">
               <div className="timeline-head">
                 <h3>{dayLabel(g.date)}</h3>
-                <span className="timeline-net">
-                  {(() => {
-                    const net = g.items.reduce((a, t) => a + (t.direction === 'out' ? t.amount : -t.amount), 0);
-                    if (!net) return 'barabar';
-                    return `${net > 0 ? '+' : '−'}${rupees(Math.abs(net))}`;
-                  })()}
-                </span>
               </div>
-              <div className="list-card">
+              <div className="card list-card">
                 {g.items.map((t) => (
                   <TxnRow
                     key={t.id}
                     txn={t}
                     personName={personName(t.personId)}
                     showPerson
-                    onClick={() => navigate(`person/${t.personId}`)}
+                    showDate={false}
+                    onClick={() => setActiveTxn(t)}
                   />
                 ))}
               </div>
@@ -100,16 +100,24 @@ export function ActivityPage() {
         </div>
       ) : (
         <EmptyState
-          icon={<BookIcon size={26} />}
-          title={filter === 'all' ? 'Kitaab khaali hai' : 'Is filter mein kuch nahi'}
-          body="Screenshot, chat ya manual entry se pehla hisaab daalo — yahan sab ek saath dikhega."
+          icon={<BookIcon size={24} />}
+          title={filter === 'all' ? 'No activity yet' : 'Nothing here'}
+          body={
+            filter === 'all'
+              ? 'Add your first expense from a screenshot, a message, or by typing it in.'
+              : 'No entries match this filter.'
+          }
           action={
-            <button type="button" className="btn btn-primary" onClick={() => navigate('scan?mode=image')}>
-              Pehla hisaab daalo
-            </button>
+            filter === 'all' ? (
+              <button type="button" className="btn btn-primary" onClick={() => navigate('scan?mode=image')}>
+                Add expense
+              </button>
+            ) : undefined
           }
         />
       )}
+
+      <TxnSheet open={!!activeTxn} onClose={() => setActiveTxn(null)} txn={activeTxn} />
     </div>
   );
 }

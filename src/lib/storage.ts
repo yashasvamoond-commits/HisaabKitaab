@@ -108,20 +108,20 @@ export function sampleState(profileName: string): AppState {
   });
 
   const txns: Txn[] = [
-    t(rahul, 'out', 250, 'Chai aur samosa', 'food', daysAgo(1, 17, 10), 'screenshot'),
-    t(rahul, 'out', 480, 'Auto se office', 'travel', daysAgo(4, 9, 20)),
-    t(rahul, 'in', 300, 'Uber ka hissa', 'travel', daysAgo(7, 21, 5), 'chat', true),
+    t(rahul, 'out', 250, 'Chai and samosa', 'food', daysAgo(1, 17, 10), 'screenshot'),
+    t(rahul, 'out', 480, 'Auto to office', 'travel', daysAgo(4, 9, 20)),
+    t(rahul, 'in', 300, 'Uber share', 'travel', daysAgo(7, 21, 5), 'chat', true),
     t(priya, 'out', 1200, 'Dinner at Social', 'food', daysAgo(2, 21, 45), 'manual'),
     t(priya, 'in', 600, 'Movie tickets', 'fun', daysAgo(9, 18, 15)),
-    t(amit, 'out', 1500, 'Kiraya ka hissa', 'rent', daysAgo(12, 11, 0)),
-    t(maa, 'in', 5000, 'Ghar ke liye', 'other', daysAgo(20, 12, 30)),
+    t(amit, 'out', 1500, 'Rent share', 'rent', daysAgo(12, 11, 0)),
+    t(maa, 'in', 5000, 'For home', 'other', daysAgo(20, 12, 30)),
     t(rahul, 'out', 180, 'Swiggy lunch', 'food', daysAgo(0, 13, 40), 'chat'),
     t(priya, 'out', 340, 'Metro recharge', 'travel', daysAgo(15, 8, 50)),
   ];
 
   return {
     version: 1,
-    profile: { name: profileName || 'Aap', createdAt: new Date().toISOString() },
+    profile: { name: profileName || 'You', createdAt: new Date().toISOString() },
     persons: [rahul, priya, amit, maa],
     txns: txns.sort((a, b) => +new Date(b.date) - +new Date(a.date)),
     settings: { onboarded: true, sound: true },

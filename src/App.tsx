@@ -9,7 +9,7 @@ import { PersonDetailPage } from './pages/PersonDetail';
 import { SettingsPage } from './pages/Settings';
 import { ScanPage } from './pages/Scan';
 import { OnboardingPage } from './pages/Onboarding';
-import { BookIcon, HomeIcon, ScanIcon, SettingsIcon, UsersIcon } from './components/Icons';
+import { BookIcon, HomeIcon, PlusIcon, SettingsIcon, UsersIcon } from './components/Icons';
 
 function TabButton({
   active,
@@ -33,21 +33,20 @@ function TabButton({
 function TabBar({ active }: { active: string }) {
   return (
     <nav className="tabbar" aria-label="Main navigation">
-      <TabButton active={active === 'home'} onClick={() => navigate('home')} icon={<HomeIcon size={22} />} label="Hisaab" />
-      <TabButton active={active === 'activity'} onClick={() => navigate('activity')} icon={<BookIcon size={22} />} label="Kitaab" />
+      <TabButton active={active === 'home'} onClick={() => navigate('home')} icon={<HomeIcon size={22} />} label="Home" />
+      <TabButton active={active === 'activity'} onClick={() => navigate('activity')} icon={<BookIcon size={22} />} label="Activity" />
       <button
         type="button"
-        className={`tab-scan ${active === 'scan' ? 'is-active' : ''}`}
+        className="tab-add"
         onClick={() => navigate('scan')}
-        aria-label="Naya hisaab daalo"
+        aria-label="Add expense"
       >
-        <span className="tab-scan-circle">
-          <ScanIcon size={25} />
+        <span className="tab-add-circle">
+          <PlusIcon size={26} />
         </span>
-        <span>Naya</span>
       </button>
-      <TabButton active={active === 'people'} onClick={() => navigate('people')} icon={<UsersIcon size={22} />} label="Log" />
-      <TabButton active={active === 'settings'} onClick={() => navigate('settings')} icon={<SettingsIcon size={22} />} label="Aap" />
+      <TabButton active={active === 'people'} onClick={() => navigate('people')} icon={<UsersIcon size={22} />} label="People" />
+      <TabButton active={active === 'settings'} onClick={() => navigate('settings')} icon={<SettingsIcon size={22} />} label="Settings" />
     </nav>
   );
 }
@@ -61,7 +60,7 @@ function Shell() {
     if (booted.current) return;
     booted.current = true;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('share') === 'error') toast('Share kiya hua content padh nahi paaye');
+    if (params.get('share') === 'error') toast('Could not read the shared content');
 
     void (async () => {
       const payload = await consumeShare();
@@ -106,7 +105,7 @@ function Shell() {
     }
   })();
 
-  const showTab = ['home', 'activity', 'people', 'settings', 'scan'].includes(route.name) && !(route.name === 'person');
+  const showTab = ['home', 'activity', 'people', 'settings'].includes(route.name);
 
   return (
     <div className="app">

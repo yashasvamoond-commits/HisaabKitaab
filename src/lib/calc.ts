@@ -75,10 +75,10 @@ export function personTxns(personId: string, txns: Txn[]): Txn[] {
 }
 
 export function lastActivityLabel(date: string | null): string {
-  if (!date) return 'Abhi koi hisaab nahi';
+  if (!date) return 'No activity yet';
   const days = Math.floor((Date.now() - +new Date(date)) / 86400000);
-  if (days <= 0) return 'Aaj ka hisaab';
-  if (days === 1) return 'Kal ka hisaab';
-  if (days < 30) return `${days} din pehle`;
+  if (days <= 0) return 'Active today';
+  if (days === 1) return 'Active yesterday';
+  if (days < 30) return `${days} days ago`;
   return new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }

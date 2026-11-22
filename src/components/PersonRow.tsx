@@ -1,5 +1,4 @@
-import { balanceOf } from '../lib/calc';
-import { lastActivityLabel } from '../lib/calc';
+import { balanceOf, lastActivityLabel } from '../lib/calc';
 import { rupees } from '../lib/format';
 import type { Person, Txn } from '../lib/types';
 import { ChevronRightIcon } from './Icons';
@@ -17,18 +16,24 @@ export function PersonRow({
   onClick: () => void;
 }) {
   const balance = balanceOf(person.id, txns);
+  const tone = balance > 0.009 ? 'is-pos' : balance < -0.009 ? 'is-neg' : 'is-clear';
+
   return (
     <button type="button" className="person-row" onClick={onClick}>
-      <Avatar name={person.name} size={46} />
+      <Avatar name={person.name} size={44} />
       <span className="person-row-main">
         <span className="person-row-name">{person.name}</span>
         <span className="person-row-sub">{lastActivityLabel(lastDate ?? null)}</span>
       </span>
-      <span className={`person-row-bal ${balance > 0 ? 'is-out' : balance < 0 ? 'is-in' : 'is-clear'}`}>
-        <span className="person-row-amount">{balance === 0 ? 'Hisaab clear' : rupees(balance)}</span>
-        <span className="person-row-hint">
-          {balance > 0 ? 'milega' : balance < 0 ? 'dena hai' : 'barabar'}
-        </span>
+      <span className={`person-row-bal ${tone}`}>
+        {Math.abs(balance) < 0.009 ? (
+          <span className="person-row-clear">Settled up</span>
+        ) : (
+          <>
+            <span className="person-row-amount">{rupees(Math.abs(balance))}</span>
+            <span className="person-row-hint">{balance > 0 ? 'owes you' : 'you owe'}</span>
+          </>
+        )}
       </span>
       <ChevronRightIcon size={17} className="person-row-chev" />
     </button>

@@ -3,41 +3,37 @@ import { useApp } from '../lib/store';
 import { downloadJson, readJsonFile } from '../lib/share';
 import { isIOS, useInstall } from '../lib/install';
 import { assetUrl } from '../lib/assets';
-import { Avatar, ConfirmSheet, Segmented } from '../components/ui';
+import { Avatar, ConfirmSheet } from '../components/ui';
 import {
-  BookIcon,
-  CameraIcon,
   CheckIcon,
   DownloadIcon,
   InfoIcon,
   PhoneIcon,
   RefreshIcon,
-  RupeeIcon,
   ShieldIcon,
   SparkleIcon,
   UploadIcon,
-  UserIcon,
-  WhatsAppIcon,
 } from '../components/Icons';
 
 export function SettingsPage() {
   const { state, persons, txns, setProfile, loadSample, resetAll, importState, toast } = useApp();
   const { canInstall, installed, install } = useInstall();
   const [name, setName] = useState(state.profile.name);
+  const [justSaved, setJustSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [sampleOpen, setSampleOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<'data' | 'how'>('data');
   const fileRef = useRef<HTMLInputElement>(null);
   const ios = isIOS();
 
   const saveName = () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      toast('Naam khaali nahi ho sakta');
+      toast('Name cannot be empty');
       return;
     }
     setProfile({ name: trimmed });
-    toast('Naam save ho gaya');
+    setJustSaved(true);
+    toast('Name saved');
   };
 
   const onImport = async (file: File) => {
@@ -45,51 +41,78 @@ export function SettingsPage() {
       const parsed = await readJsonFile(file);
       if (!Array.isArray(parsed.persons) || !Array.isArray(parsed.txns)) throw new Error('bad file');
       importState(parsed);
-      toast('Backup wapas aa gaya');
+      toast('Backup restored');
     } catch {
-      toast('Yeh backup file theek nahi lag rahi');
+      toast('That backup file could not be read');
     }
   };
 
   return (
     <div className="page page--settings">
-      <header className="topbar">
+      <header className="page-head">
         <div>
-          <h1 className="page-title">Aap</h1>
-          <p className="page-sub">Profile, backup aur app</p>
+          <h1 className="page-title">Settings</h1>
+          <p className="page-sub">Profile, data and app</p>
         </div>
       </header>
 
-      <section className="profile-card">
-        <Avatar name={state.profile.name || 'Aap'} size={58} />
-        <div className="profile-main">
-          <span className="profile-label">Aapka naam</span>
-          <input
-            className="profile-input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Apna naam likho"
-            maxLength={40}
-            aria-label="Aapka naam"
-          />
-          <span className="profile-hint">Reminders mein yahi naam use hota hai</span>
+      <section className="card settings-card">
+        <div className="settings-head">
+          <h2>Profile</h2>
         </div>
-        <button type="button" className="btn btn-mini btn-primary" onClick={saveName} disabled={name.trim() === state.profile.name}>
-          <CheckIcon size={16} /> Save
-        </button>
+        <div className="profile-row">
+          <Avatar name={state.profile.name || 'You'} size={52} />
+          <div className="profile-main">
+            <label className="field-label" htmlFor="profile-name">
+              Your name
+            </label>
+            <input
+              id="profile-name"
+              className="field field-input"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setJustSaved(false);
+              }}
+              placeholder="Your name"
+              maxLength={40}
+              autoComplete="name"
+            />
+          </div>
+        </div>
+        <p className="settings-hint">
+          Payments made to this name are understood as money received.
+        </p>
+        {name.trim() !== state.profile.name ? (
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            onClick={saveName}
+            disabled={!name.trim()}
+          >
+            <CheckIcon size={17} /> Save name
+          </button>
+        ) : justSaved ? (
+          <p className="settings-saved">
+            <CheckIcon size={14} /> Saved
+          </p>
+        ) : null}
       </section>
 
-      <section className="settings-card install-card">
+      <section className="card settings-card">
+        <div className="settings-head">
+          <h2>Install app</h2>
+        </div>
         <div className="settings-row">
-          <span className="settings-icon settings-icon--saffron">
-            <PhoneIcon size={20} />
+          <span className="settings-icon is-teal">
+            <PhoneIcon size={19} />
           </span>
           <div className="settings-copy">
-            <strong>{installed ? 'App install hai' : 'Phone mein app ki tarah rakho'}</strong>
+            <strong>{installed ? 'Installed' : 'Add to your home screen'}</strong>
             <span>
               {installed
-                ? 'Home screen se seedha khul jaata hai, offline bhi chalta hai.'
-                : 'Home screen par install karo — na Play Store, na App Store.'}
+                ? 'Open HisaabKitaab with one tap. It also works offline.'
+                : 'No app store. Works on Android and iPhone.'}
             </span>
           </div>
           {!installed && canInstall && (
@@ -103,206 +126,127 @@ export function SettingsPage() {
             <li>
               <span className="step-num">1</span>
               {ios ? (
-                <>Safari mein neeche <strong>Share</strong> button dabao (upar teer wala)</>
+                <>In Safari, tap the <strong>Share</strong> button</>
               ) : (
-                <>Chrome mein upar right ke <strong>⋮</strong> menu mein jao</>
+                <>Open this page in Chrome or Safari on your phone</>
               )}
             </li>
             <li>
               <span className="step-num">2</span>
               {ios ? (
-                <><strong>Add to Home Screen</strong> chuno</>
+                <>Choose <strong>Add to Home Screen</strong></>
               ) : (
-                <><strong>Install app</strong> ya <strong>Add to Home screen</strong> chuno</>
+                <>Tap the menu, then <strong>Install app</strong></>
               )}
             </li>
             <li>
               <span className="step-num">3</span>
-              Bas — icon home screen par aa jaayega
+              HisaabKitaab appears on your home screen
             </li>
           </ol>
         )}
-        <p className="settings-note">
-          <SparkleIcon size={14} /> PWA hai — iOS aur Android dono par ek hi link se chalta hai.
-        </p>
       </section>
 
-      <Segmented
-        value={activeSection}
-        onChange={setActiveSection}
-        options={[
-          { value: 'data', label: 'Data & backup' },
-          { value: 'how', label: 'Kaise chalta hai' },
-        ]}
-      />
+      <section className="card settings-card">
+        <div className="settings-head">
+          <h2>Data</h2>
+          <span>
+            {persons.length} {persons.length === 1 ? 'person' : 'people'} · {txns.length}{' '}
+            {txns.length === 1 ? 'entry' : 'entries'}
+          </span>
+        </div>
+        <button type="button" className="settings-action" onClick={() => downloadJson(state)}>
+          <span className="settings-icon is-teal">
+            <DownloadIcon size={18} />
+          </span>
+          <span className="settings-action-text">
+            <strong>Back up data</strong>
+            <em>Download a backup file</em>
+          </span>
+        </button>
+        <button type="button" className="settings-action" onClick={() => fileRef.current?.click()}>
+          <span className="settings-icon is-blue">
+            <UploadIcon size={18} />
+          </span>
+          <span className="settings-action-text">
+            <strong>Restore backup</strong>
+            <em>Choose a backup file</em>
+          </span>
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onImport(file);
+            e.target.value = '';
+          }}
+        />
+        <button type="button" className="settings-action" onClick={() => setSampleOpen(true)}>
+          <span className="settings-icon is-amber">
+            <SparkleIcon size={18} />
+          </span>
+          <span className="settings-action-text">
+            <strong>Load sample data</strong>
+            <em>Try the app with example people</em>
+          </span>
+        </button>
+        <button type="button" className="settings-action" onClick={() => setResetOpen(true)}>
+          <span className="settings-icon is-red">
+            <RefreshIcon size={18} />
+          </span>
+          <span className="settings-action-text">
+            <strong>Reset everything</strong>
+            <em>Delete all people and expenses</em>
+          </span>
+        </button>
+      </section>
 
-      {activeSection === 'data' ? (
-        <>
-          <section className="settings-card">
-            <div className="settings-head">
-              <h2>Data</h2>
-              <span>{persons.length} log · {txns.length} hisaab</span>
-            </div>
-            <button type="button" className="settings-action" onClick={() => downloadJson(state)}>
-              <span className="settings-icon settings-icon--green">
-                <DownloadIcon size={19} />
-              </span>
-              <span className="settings-action-text">
-                <strong>Backup banao</strong>
-                <em>JSON file download hogi</em>
-              </span>
-            </button>
-            <button type="button" className="settings-action" onClick={() => fileRef.current?.click()}>
-              <span className="settings-icon settings-icon--ink">
-                <UploadIcon size={19} />
-              </span>
-              <span className="settings-action-text">
-                <strong>Backup wapas lao</strong>
-                <em>Purani JSON file chuno</em>
-              </span>
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/json,.json"
-              hidden
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onImport(file);
-                e.target.value = '';
-              }}
-            />
-            <button type="button" className="settings-action" onClick={() => setSampleOpen(true)}>
-              <span className="settings-icon settings-icon--rose">
-                <SparkleIcon size={19} />
-              </span>
-              <span className="settings-action-text">
-                <strong>Sample hisaab dekho</strong>
-                <em>Nakli data se app try karo</em>
-              </span>
-            </button>
-            <button type="button" className="settings-action" onClick={() => setResetOpen(true)}>
-              <span className="settings-icon settings-icon--red">
-                <RefreshIcon size={19} />
-              </span>
-              <span className="settings-action-text">
-                <strong>Sab kuch reset karo</strong>
-                <em>Saara hisaab mit jaayega</em>
-              </span>
-            </button>
-          </section>
-
-          <section className="settings-card">
-            <div className="settings-head">
-              <h2>Aapki app</h2>
-              <span>v1.0</span>
-            </div>
-            <div className="about-row">
-              <img src={assetUrl('icons/icon-192.png')} alt="" width={44} height={44} className="about-icon" />
-              <div>
-                <strong>HisaabKitaab</strong>
-                <p>Apna hisaab, apni zubaani. Banaya gaya India mein.</p>
-              </div>
-            </div>
-            <p className="settings-note settings-note--block">
-              Saara data sirf aapke phone mein rehta hai. Koi login nahi, koi server nahi. Backup file se hi data
-              doosre phone par ja sakta hai.
-            </p>
-          </section>
-        </>
-      ) : (
-        <>
-          <section className="settings-card">
-            <div className="settings-head">
-              <h2>Screenshot se hisaab</h2>
-            </div>
-            <ol className="how-steps">
-              <li>
-                <span className="how-icon"><CameraIcon size={19} /></span>
-                <div>
-                  <strong>Screenshot ya chat daalo</strong>
-                  <p>GPay, PhonePe, Paytm, bank SMS ya WhatsApp — sab padh leta hai.</p>
-                </div>
-              </li>
-              <li>
-                <span className="how-icon"><SparkleIcon size={19} /></span>
-                <div>
-                  <strong>Naam, amount aur kisne diya — khud samajhta hai</strong>
-                  <p>Jo samajh aaya woh dikha deta hai, taaki aap check kar sako.</p>
-                </div>
-              </li>
-              <li>
-                <span className="how-icon"><UserIcon size={19} /></span>
-                <div>
-                  <strong>Purana khata milta hai, naya khud banta hai</strong>
-                  <p>Rahul ka hisaab pehle se hai toh usi mein add, nahi toh naya khata.</p>
-                </div>
-              </li>
-              <li>
-                <span className="how-icon"><RupeeIcon size={19} /></span>
-                <div>
-                  <strong>Milna ya dena — seedha saaf</strong>
-                  <p>Har banda ka balance, poora kitaab, aur polite WhatsApp reminder.</p>
-                </div>
-              </li>
-            </ol>
-          </section>
-
-          <section className="settings-card">
-            <div className="settings-head">
-              <h2>Bharosa</h2>
-            </div>
-            <div className="assurance">
-              <ShieldIcon size={20} />
-              <div>
-                <strong>Aapka data aapke paas</strong>
-                <p>Screenshot OCR bhi phone par hi hota hai — internet par kuch nahi jaata.</p>
-              </div>
-            </div>
-            <div className="assurance">
-              <WhatsAppIcon size={20} />
-              <div>
-                <strong>Koi awkward reminder nahi</strong>
-                <p>Polite Hinglish message khud ban jaata hai, aap bhejne se pehle padh sakte ho.</p>
-              </div>
-            </div>
-            <div className="assurance">
-              <BookIcon size={20} />
-              <div>
-                <strong>Offline chalta hai</strong>
-                <p>Ek baar khulne ke baad internet ke bina bhi hisaab likh sakte ho.</p>
-              </div>
-            </div>
-          </section>
-        </>
-      )}
+      <section className="card settings-card">
+        <div className="settings-head">
+          <h2>About</h2>
+        </div>
+        <div className="about-row">
+          <img src={assetUrl('icons/icon-192.png')} alt="" width={44} height={44} className="about-icon" />
+          <div>
+            <strong>HisaabKitaab</strong>
+            <p>Version 1.0 · Shared expenses, made simple.</p>
+          </div>
+        </div>
+        <div className="assurance">
+          <ShieldIcon size={18} />
+          <p>Data stays on this device. Screenshots are read on your phone. No account, no server.</p>
+        </div>
+      </section>
 
       <p className="settings-foot">
-        <InfoIcon size={14} /> HisaabKitaab · v1.0 · made for real Indian hisaab
+        <InfoIcon size={13} /> Made for everyday shared expenses
       </p>
 
       <ConfirmSheet
         open={resetOpen}
         onClose={() => setResetOpen(false)}
-        title="Sab kuch mita dein?"
-        body={<p>Saare log aur hisaab hamesha ke liye delete ho jaayenge. Pehle backup bana lo toh behtar hai.</p>}
-        confirmLabel="Haan, sab mitao"
+        title="Reset everything?"
+        body={<p>All people and expenses will be deleted permanently. Back up first if you want to keep them.</p>}
+        confirmLabel="Delete everything"
         danger
         onConfirm={() => {
           resetAll();
-          toast('Sab clear. Naya hisaab shuru karo.');
+          toast('All data deleted');
         }}
       />
 
       <ConfirmSheet
         open={sampleOpen}
         onClose={() => setSampleOpen(false)}
-        title="Sample hisaab load karein?"
-        body={<p>Yeh aapka abhi ka data replace kar dega (dost sample ke liye). Pehle backup bana sakte ho.</p>}
-        confirmLabel="Haan, sample dikhao"
+        title="Load sample data?"
+        body={<p>This replaces your current data with example people and expenses.</p>}
+        confirmLabel="Load sample"
         onConfirm={() => {
           loadSample();
-          toast('Sample hisaab load ho gaya');
+          toast('Sample data loaded');
         }}
       />
     </div>

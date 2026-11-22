@@ -1,8 +1,8 @@
 export type Direction = 'out' | 'in';
 
 /**
- * out = maine paise diye (banda mujhe dega)  → balance +
- * in  = unhone paise diye (main unhe dunga)  → balance -
+ * out = you paid (they owe you)  -> balance +
+ * in  = they paid (you owe them) -> balance -
  */
 export type Source = 'manual' | 'screenshot' | 'chat' | 'sms' | 'shared';
 
@@ -61,21 +61,21 @@ export interface AppState {
   settings: Settings;
 }
 
-export const CATEGORIES: { id: Category; label: string; emoji: string }[] = [
-  { id: 'food', label: 'Khana-peena', emoji: '🍛' },
-  { id: 'travel', label: 'Safar', emoji: '🛺' },
-  { id: 'bills', label: 'Bills', emoji: '💡' },
-  { id: 'rent', label: 'Kiraya', emoji: '🏠' },
-  { id: 'shopping', label: 'Shopping', emoji: '🛍️' },
-  { id: 'fun', label: 'Masti', emoji: '🎬' },
-  { id: 'health', label: 'Sehat', emoji: '💊' },
-  { id: 'other', label: 'Baaki', emoji: '📌' },
+export const CATEGORIES: { id: Category; label: string }[] = [
+  { id: 'food', label: 'Food & drinks' },
+  { id: 'travel', label: 'Travel' },
+  { id: 'bills', label: 'Bills' },
+  { id: 'rent', label: 'Rent' },
+  { id: 'shopping', label: 'Shopping' },
+  { id: 'fun', label: 'Entertainment' },
+  { id: 'health', label: 'Health' },
+  { id: 'other', label: 'Other' },
 ];
 
 export const SOURCE_LABEL: Record<Source, string> = {
   manual: 'Manual',
   screenshot: 'Screenshot',
-  chat: 'Chat',
+  chat: 'Message',
   sms: 'SMS',
   shared: 'Shared',
 };

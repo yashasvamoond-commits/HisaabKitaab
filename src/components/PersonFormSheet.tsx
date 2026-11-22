@@ -33,16 +33,16 @@ export function PersonFormSheet({
 
   const save = () => {
     const trimmed = name.trim();
-    if (!trimmed) {
-      toast('Naam toh likho');
+    if (trimmed.length < 2) {
+      toast('Enter a name');
       return;
     }
     if (person) {
       updatePerson(person.id, { name: trimmed, upi: upi.trim() || undefined, phone: phone.trim() || undefined });
-      toast('Naam update ho gaya');
+      toast('Person updated');
     } else {
       const created = addPerson({ name: trimmed, upi: upi.trim(), phone: phone.trim() });
-      toast(`${trimmed} ka khata ban gaya`);
+      toast(`${trimmed} added`);
       onCreated?.(created.id);
     }
     onClose();
@@ -52,32 +52,32 @@ export function PersonFormSheet({
     <Sheet
       open={open}
       onClose={onClose}
-      title={person ? 'Bande ki detail' : 'Naya banda'}
-      subtitle={person ? 'Naam ya UPI badal sakte ho' : 'Naam kaafi hai — baaki baad mein'}
+      title={person ? 'Edit person' : 'Add person'}
+      subtitle={person ? 'Update their details.' : 'A name is enough. UPI and phone are optional.'}
       footer={
         <button type="button" className="btn btn-primary btn-block" onClick={save}>
-          {person ? 'Save karo' : 'Khata banao'}
+          {person ? 'Save changes' : 'Add person'}
         </button>
       }
     >
       <div className="sheet-form">
         <div className="field-block">
           <label className="field-label" htmlFor="person-name">
-            Naam
+            Name
           </label>
           <input
             id="person-name"
             className="field field-input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Jaise: Rahul Sharma"
+            placeholder="e.g. Rahul Sharma"
             autoFocus={!person}
             maxLength={48}
           />
         </div>
         <div className="field-block">
           <label className="field-label" htmlFor="person-upi">
-            UPI ID <span className="optional">(optional)</span>
+            UPI ID <span className="optional">optional</span>
           </label>
           <input
             id="person-upi"
@@ -92,7 +92,7 @@ export function PersonFormSheet({
         </div>
         <div className="field-block">
           <label className="field-label" htmlFor="person-phone">
-            WhatsApp number <span className="optional">(optional)</span>
+            WhatsApp number <span className="optional">optional</span>
           </label>
           <input
             id="person-phone"
@@ -108,26 +108,26 @@ export function PersonFormSheet({
           <div className="danger-zone">
             {!confirmDelete ? (
               <button type="button" className="link-danger" onClick={() => setConfirmDelete(true)}>
-                <TrashIcon size={16} /> Bandaa aur uska hisaab hatao
+                <TrashIcon size={16} /> Delete person and their history
               </button>
             ) : (
               <div className="danger-strip">
-                <span>Iske saare hisaab bhi delete ho jaayenge. Pakka?</span>
+                <span>This also deletes all expenses with them. Continue?</span>
                 <div className="row gap-8">
                   <button type="button" className="btn btn-mini btn-ghost" onClick={() => setConfirmDelete(false)}>
-                    Nahi
+                    Cancel
                   </button>
                   <button
                     type="button"
                     className="btn btn-mini btn-danger"
                     onClick={() => {
                       deletePerson(person.id);
-                      toast('Khata hata diya');
+                      toast('Person deleted');
                       onClose();
                       onDeleted?.();
                     }}
                   >
-                    Haan, hatao
+                    Delete
                   </button>
                 </div>
               </div>

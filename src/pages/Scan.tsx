@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../lib/store';
 import { balanceOf } from '../lib/calc';
-import { dateKey, formatAmountInput, rupees, signedRupees } from '../lib/format';
+import { dateKey, formatAmountInput, rupees } from '../lib/format';
 import { parseAmountInput, parseTransaction, type ParsedDraft } from '../lib/parse';
 import { takePendingShare } from '../lib/share';
 import { ocrImage } from '../lib/ocr';
@@ -14,16 +14,16 @@ import {
   ArrowDownLeftIcon,
   ArrowUpRightIcon,
   CameraIcon,
+  CategoryIcon,
   CheckIcon,
   ChevronLeftIcon,
   ClipboardIcon,
   CloseIcon,
   ImageIcon,
+  InfoIcon,
   PlusIcon,
   SparkleIcon,
   UploadIcon,
-  CategoryIcon,
-  UserIcon,
 } from '../components/Icons';
 
 type Mode = 'image' | 'text' | 'manual';
@@ -40,40 +40,67 @@ interface SavedResult {
 
 const SAMPLES: { label: string; text: string }[] = [
   {
-    label: 'GPay screenshot',
-    text: 'You paid\n₹250\nTo Rahul Sharma\nrahul.sharma@okaxis\nTransaction successful\nToday, 4:32 PM\nUPI Ref: 123456789012',
+    label: 'UPI payment',
+    text: 'You paid ₹250 to Rahul Sharma\nrahul.sharma@okaxis\nTransaction successful\nToday, 4:32 PM\nUPI Ref: 123456789012',
   },
   {
     label: 'Bank SMS',
-    text: 'Rs.1200.00 debited from A/c XX1234 on 22-11-26 to VPA rahul@okaxis (RAHUL SHARMA). UPI Ref 456789123456. Avl Bal Rs.8,420.35',
+    text: 'Rs.1,200.00 debited from A/c XX1234 on 22-11-26 to VPA rahul@okaxis (RAHUL SHARMA). UPI Ref 456789123456. Avl Bal Rs.8,420.35',
   },
   {
-    label: 'PhonePe received',
-    text: 'Paytm\nMoney received!\n₹1,500\nPriya Verma paid you ₹1,500\nTransaction ID 4567890123',
+    label: 'Payment received',
+    text: 'Money received!\n₹1,500\nPriya Verma paid you ₹1,500\nTransaction ID 4567890123',
   },
   {
-    label: 'WhatsApp chat',
-    text: 'Rahul: bhai kal ke chai ke 120 rupaye diye the, 80 baaki hai',
-  },
-  {
-    label: 'Hinglish',
+    label: 'Chat message',
     text: 'Maine Rahul ko auto ke liye 90 rupaye diye',
   },
 ];
 
 function confidenceLabel(value: number): { text: string; tone: string } {
-  if (value >= 0.8) return { text: 'Pakka lag raha hai', tone: 'green' };
-  if (value >= 0.55) return { text: 'Thoda check kar lo', tone: 'saffron' };
-  return { text: 'Andaaza hai — check karo', tone: 'red' };
+  if (value >= 0.8) return { text: 'Looks good', tone: 'pos' };
+  if (value >= 0.55) return { text: 'Please check', tone: 'warn' };
+  return { text: 'Check the details', tone: 'neg' };
 }
 
 function progressLabel(status: string): string {
   const s = status.toLowerCase();
-  if (s.includes('loading tesseract core')) return 'Engine load ho raha hai';
-  if (s.includes('loading language') || s.includes('traineddata')) return 'English samajh rahe hain';
-  if (s.includes('initializing')) return 'Taiyaar ho raha hai';
-  if (s.includes('recognizing')) return 'Screenshot padh rahe hain';
-  return 'Kaam chal raha hai';
+  if (s.includes('loading tesseract core')) return 'Loading the reader';
+  if (s.includes('loading language') || s.includes('traineddata')) return 'Loading English';
+  if (s.includes('initializing')) return 'Getting ready';
+  if (s.includes('recognizing')) return 'Reading the screenshot';
+  return 'Reading the screenshot';
+}
+
+function sourceName(source: Txn['source']): string {
+  if (source === 'screenshot') return 'Screenshot';
+  if (source === 'sms') return 'Bank SMS';
+  if (source === 'chat') return 'Message';
+  if (source === 'shared') return 'Shared';
+  return 'Manual';
+}
+
+function balanceText(name: string, balance: number): string {
+  if (Math.abs(balance) < 0.009) return 'Settled up';
+  return balance > 0
+    ? `${name} owes you ${rupees(balance)}`
+    : `You owe ${name} ${rupees(Math.abs(balance))}`;
+}
+
+/** Prefer drafts with a real amount, a currency mark, a person and a direction. */
+function draftScore(d: ParsedDraft, text: string): number {
+  let score = 0;
+  if (d.amount != null) score += 4;
+  if (d.amount != null && d.amountMarker && /[₹€£¥¢]|\brs\.?|\binr/i.test(d.amountMarker)) score += 2;
+  else if (d.amount != null && d.amountMarker && /[©®#]/.test(d.amountMarker)) score += 1;
+  if (d.amount != null && d.amount < 10 && /\b\d{1,3}(?:,\d{3})+\b/.test(text)) score -= 3;
+  if (d.person) score += 2.5;
+  if (d.direction !== 'unknown') score += 1;
+  if (d.selfPayment) score += 1.5;
+  if (/\b(paid to|received from|debited from|credited to|banking name)\b/i.test(text)) score += 1;
+  if (d.amount != null && d.amount > 100000 && !(d.amountMarker && /[₹€£¥¢]/.test(d.amountMarker))) score -= 2.5;
+  score += d.confidence || 0;
+  return score;
 }
 
 export function ScanPage({ route }: { route: Route }) {
@@ -81,7 +108,6 @@ export function ScanPage({ route }: { route: Route }) {
   const initialMode = (route.query.get('mode') as Mode) || 'image';
   const [mode, setMode] = useState<Mode>(['image', 'text', 'manual'].includes(initialMode) ? initialMode : 'image');
   const [stage, setStage] = useState<Stage>('input');
-  const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>('');
   const [rawText, setRawText] = useState('');
   const [draft, setDraft] = useState<ParsedDraft | null>(null);
@@ -110,7 +136,6 @@ export function ScanPage({ route }: { route: Route }) {
 
   const resetAll = useCallback(() => {
     setStage('input');
-    setFile(null);
     setPreview('');
     setDraft(null);
     setError('');
@@ -147,11 +172,10 @@ export function ScanPage({ route }: { route: Route }) {
   const handleFile = useCallback(
     async (selected: File) => {
       if (!selected.type.startsWith('image/')) {
-        toast('Photo ya screenshot chuno');
+        toast('Choose an image file');
         return;
       }
       setError('');
-      setFile(selected);
       if (previewRef.current) URL.revokeObjectURL(previewRef.current);
       const url = URL.createObjectURL(selected);
       previewRef.current = url;
@@ -159,26 +183,28 @@ export function ScanPage({ route }: { route: Route }) {
       setSource('screenshot');
       setStage('reading');
       setProgress(0);
-      setProgressText('Screenshot taiyaar kar rahe hain');
+      setProgressText('Preparing the screenshot');
       try {
-        const text = await ocrImage(selected, (p, status) => {
+        const { text, variants } = await ocrImage(selected, (p, status) => {
           setProgress(p);
           setProgressText(progressLabel(status));
         });
-        setRawText(text);
         if (!text.trim()) {
-          setError('Screenshot mein text nahi mila. Neeche message likh do, ya doosra screenshot try karo.');
+          setError('No text found. Try a clearer screenshot, or enter it manually.');
           setStage('input');
-          setMode('text');
           return;
         }
-        const parsed = parseTransaction(text, { persons, selfName, source: 'screenshot' });
-        applyDraft(parsed, text);
+
+        const parsed = variants
+          .map((variant) => ({ text: variant, draft: parseTransaction(variant, { persons, selfName, source: 'screenshot' }) }))
+          .sort((a, b) => draftScore(b.draft, b.text) - draftScore(a.draft, a.text));
+        const best = parsed[0];
+        applyDraft(best.draft, best.text);
+        if (best.draft.amount == null) toast('Could not find the amount — enter it below');
       } catch (err) {
         console.error(err);
-        setError('Screenshot padhne mein dikkat aayi. Aap text paste kar do — hisaab phir bhi ban jaayega.');
+        setError('Could not read this screenshot. Try again, or enter it manually.');
         setStage('input');
-        setMode('text');
       }
     },
     [applyDraft, persons, selfName, toast],
@@ -188,7 +214,7 @@ export function ScanPage({ route }: { route: Route }) {
     (textOverride?: string) => {
       const text = (textOverride ?? rawText).trim();
       if (!text) {
-        toast('Pehle message ya screenshot ka text daalo');
+        toast('Paste a message first');
         textAreaRef.current?.focus();
         return;
       }
@@ -197,10 +223,24 @@ export function ScanPage({ route }: { route: Route }) {
       setSource(src);
       const parsed = parseTransaction(text, { persons, selfName, source: src });
       applyDraft(parsed, text);
-      if (parsed.confidence < 0.4) toast('Text se zyada kuch samajh nahi aaya — fields khud bhar lo');
+      if (parsed.confidence < 0.4) toast('Some details need checking');
     },
     [applyDraft, persons, rawText, selfName, toast],
   );
+
+  const startManual = useCallback(() => {
+    setMode('manual');
+    setSource('manual');
+    const empty = parseTransaction('', { persons, selfName, source: 'manual' });
+    setDraft(empty);
+    setAmountText('');
+    setDirection('out');
+    setPersonValue({});
+    setNote('');
+    setCategory('other');
+    setDateText(dateKey(new Date()));
+    setStage('review');
+  }, [persons, selfName]);
 
   // Deep link (#/scan?mode=manual) opens the form straight away.
   useEffect(() => {
@@ -208,7 +248,7 @@ export function ScanPage({ route }: { route: Route }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Share sheet / clipboard handoff
+  // Share sheet handoff.
   useEffect(() => {
     const payload = takePendingShare();
     if (!payload) return;
@@ -223,7 +263,7 @@ export function ScanPage({ route }: { route: Route }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Paste a screenshot or a message anywhere on this screen
+  // Paste an image or message anywhere on the add screen.
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       if (stage === 'review' || stage === 'saved') return;
@@ -262,19 +302,17 @@ export function ScanPage({ route }: { route: Route }) {
   const selectedPerson = personValue.personId ? persons.find((p) => p.id === personValue.personId) : undefined;
   const displayName = selectedPerson?.name || personValue.name?.trim() || '';
   const previousBalance = selectedPerson ? balanceOf(selectedPerson.id, txns) : null;
-  const nextBalance =
-    previousBalance == null ? null : previousBalance + (direction === 'out' ? amount : -amount);
-  const confidence = draft ? confidenceLabel(draft.confidence) : null;
-
+  const nextBalance = previousBalance == null ? null : previousBalance + (direction === 'out' ? amount : -amount);
+  const confidence = draft && source !== 'manual' ? confidenceLabel(draft.confidence) : null;
   const suggestions = useMemo(() => (draft?.candidates || []).slice(0, 3), [draft]);
 
   const save = () => {
     if (!amount) {
-      toast('Amount toh daalo');
+      toast('Enter an amount');
       return;
     }
     if (!personValue.personId && !displayName) {
-      toast('Banda chuno ya naya naam likho');
+      toast(draft?.selfPayment ? 'Choose who sent it' : 'Select a person');
       return;
     }
     const isNewPerson = !personValue.personId;
@@ -298,27 +336,10 @@ export function ScanPage({ route }: { route: Route }) {
     setStage('saved');
   };
 
-  const startManual = () => {
-    setMode('manual');
-    setSource('manual');
-    const empty = parseTransaction('', { persons, selfName, source: 'manual' });
-    setDraft(empty);
-    setAmountText('');
-    setDirection('out');
-    setPersonValue({});
-    setNote('');
-    setCategory('other');
-    setDateText(dateKey(new Date()));
-    setStage('review');
-  };
-
   const switchMode = (next: Mode) => {
-    if (next === 'manual') {
-      startManual();
-      return;
-    }
     setMode(next);
-    if (stage !== 'input') {
+    setError('');
+    if (next !== 'manual' && stage !== 'input') {
       setStage('input');
       setDraft(null);
     }
@@ -331,38 +352,35 @@ export function ScanPage({ route }: { route: Route }) {
       <div className="page page--scan">
         <div className="saved-wrap">
           <div className="saved-badge">
-            <CheckIcon size={34} />
+            <CheckIcon size={32} />
           </div>
-          <h1 className="saved-title">Hisaab mein daal diya</h1>
+          <h1 className="saved-title">Entry added</h1>
           <p className="saved-sub">
-            {result.isNewPerson ? `Naya khata ban gaya — ${result.personName}` : `${result.personName} ke khate mein add ho gaya`}
+            {result.isNewPerson ? `${result.personName} was added to People` : `Saved with ${result.personName}`}
           </p>
 
-          <div className="saved-card">
+          <div className="card saved-card">
             <Avatar name={result.personName} size={44} />
             <div className="saved-main">
               <span className="saved-name">{result.personName}</span>
               <span className="saved-note">
-                {result.direction === 'out' ? 'Aapne diye' : 'Unhone diye'} · {rupees(result.txn.amount)}
+                {result.direction === 'out' ? 'You lent' : 'They paid you'} {rupees(result.txn.amount)}
                 {result.txn.note ? ` · ${result.txn.note}` : ''}
               </span>
             </div>
-            <span className={`saved-amount ${result.direction === 'out' ? 'is-out' : 'is-in'}`}>
+            <span className={`saved-amount ${result.direction === 'out' ? 'is-pos' : 'is-neg'}`}>
               {result.direction === 'out' ? '+' : '−'}
               {rupees(result.txn.amount)}
             </span>
           </div>
 
-          <div className={`saved-balance ${result.balance > 0 ? 'is-out' : result.balance < 0 ? 'is-in' : 'is-clear'}`}>
-            {result.balance > 0
-              ? `${firstName} aapko ${rupees(result.balance)} dega`
-              : result.balance < 0
-                ? `Ab aapko ${firstName} ko ${rupees(Math.abs(result.balance))} dene hain`
-                : 'Hisaab barabar ho gaya'}
+          <div className={`saved-balance ${result.balance > 0.009 ? 'is-pos' : result.balance < -0.009 ? 'is-neg' : 'is-clear'}`}>
+            {balanceText(result.personName, result.balance)}
           </div>
-          {!result.isNewPerson && result.previousBalance != null && (
+          {result.previousBalance != null && Math.abs(result.previousBalance) > 0.009 && (
             <p className="saved-delta">
-              Pehle {signedRupees(result.previousBalance)} tha → ab {signedRupees(result.balance)}
+              Balance went from {balanceText(result.personName, result.previousBalance)} to{' '}
+              {balanceText(result.personName, result.balance)}.
             </p>
           )}
 
@@ -375,13 +393,17 @@ export function ScanPage({ route }: { route: Route }) {
                 setMode('image');
               }}
             >
-              <PlusIcon size={18} /> Aur ek hisaab daalo
+              <PlusIcon size={18} /> Add another
             </button>
-            <button type="button" className="btn btn-outline btn-block" onClick={() => navigate(`person/${result.txn.personId}`)}>
-              <UserIcon size={18} /> {firstName} ka khata dekho
+            <button
+              type="button"
+              className="btn btn-outline btn-block"
+              onClick={() => navigate(`person/${result.txn.personId}`)}
+            >
+              View {firstName}
             </button>
             <button type="button" className="link-quiet" onClick={() => navigate('home')}>
-              Ghar chalo
+              Done
             </button>
           </div>
         </div>
@@ -393,7 +415,7 @@ export function ScanPage({ route }: { route: Route }) {
   if (stage === 'review' && draft) {
     return (
       <div className="page page--scan page--review">
-        <header className="topbar topbar--compact">
+        <header className="topbar">
           <button
             type="button"
             className="icon-btn"
@@ -402,57 +424,52 @@ export function ScanPage({ route }: { route: Route }) {
               setDraft(null);
               setError('');
             }}
-            aria-label="Wapas"
+            aria-label="Back"
           >
             <ChevronLeftIcon size={22} />
           </button>
-          <span className="topbar-center">Yeh samajh aaya</span>
+          <span className="topbar-title">Review expense</span>
           <span className="topbar-spacer" />
         </header>
 
-        <div className="review-top">
-          <div>
-            <span className="review-eyebrow">
-              {source === 'screenshot' ? 'Screenshot se' : source === 'sms' ? 'SMS se' : source === 'chat' ? 'Chat se' : 'Aapne likha'}
-            </span>
-            {confidence && source !== 'manual' && (
-              <span className={`confidence is-${confidence.tone}`}>{confidence.text}</span>
-            )}
-          </div>
-          {draft.app && <span className="app-badge">{draft.app}</span>}
+        <div className="review-source">
+          <span className="source-chip">{sourceName(source)}</span>
+          {draft.app && draft.app !== sourceName(source) && <span className="source-app">{draft.app}</span>}
+          {confidence && <span className={`confidence is-${confidence.tone}`}>{confidence.text}</span>}
+          {preview && (
+            <button type="button" className="review-thumb" onClick={() => setShowPreview(true)} aria-label="View screenshot">
+              <img src={preview} alt="Screenshot" />
+            </button>
+          )}
         </div>
 
-        {draft.signals.length > 0 && (
-          <div className="signals" aria-label="Kya samajh aaya">
-            {draft.signals.slice(0, 4).map((s) => (
-              <span key={s} className="signal">
-                <CheckIcon size={13} /> {s}
-              </span>
-            ))}
+        {draft.selfPayment && !personValue.personId && !displayName && (
+          <div className="notice is-info">
+            <span className="notice-icon">
+              <InfoIcon size={18} />
+            </span>
+            <div className="notice-text">
+              <strong>This payment was made to you.</strong>
+              <span>Choose who sent it so the balance goes to the right person.</span>
+            </div>
+          </div>
+        )}
+
+        {source !== 'manual' && draft.amount == null && (
+          <div className="notice is-warning">
+            <span className="notice-icon">
+              <InfoIcon size={18} />
+            </span>
+            <div className="notice-text">
+              <strong>Could not find the amount.</strong>
+              <span>Enter it below.</span>
+            </div>
           </div>
         )}
 
         <section className="review-card">
           <div className="field-block">
-            <span className="field-label">Kisne paise diye?</span>
-            <Segmented
-              value={direction}
-              onChange={setDirection}
-              options={[
-                { value: 'out', label: 'Maine diye', icon: <ArrowUpRightIcon size={16} /> },
-                { value: 'in', label: 'Unhone diye', icon: <ArrowDownLeftIcon size={16} /> },
-              ]}
-            />
-            {amount > 0 && (
-              <p className="hint-line">
-                {direction === 'out' ? `${displayName || 'Yeh banda'} aapko` : `Aap ${displayName || 'unhe'} ko`}{' '}
-                <strong>{rupees(amount)}</strong> {direction === 'out' ? 'dega' : 'denge'}
-              </p>
-            )}
-          </div>
-
-          <div className="field-block">
-            <span className="field-label">Kitne paise?</span>
+            <span className="field-label">Amount</span>
             <div className="amount-field amount-field--review">
               <span className="amount-currency">₹</span>
               <input
@@ -461,86 +478,108 @@ export function ScanPage({ route }: { route: Route }) {
                 value={amountText}
                 onChange={(e) => setAmountText(e.target.value.replace(/[^\d.,]/g, ''))}
                 aria-label="Amount"
+                placeholder="0"
               />
             </div>
           </div>
 
           <div className="field-block">
-            <PersonSelect value={personValue} onChange={setPersonValue} suggestions={suggestions} onOpenChange={setPickerOpen} />
-            {!personValue.personId && displayName && (
-              <p className="new-person-hint">
-                <SparkleIcon size={14} /> “{displayName}” ka naya khata ban jaayega
+            <span className="field-label">Who paid?</span>
+            <Segmented
+              value={direction}
+              onChange={setDirection}
+              options={[
+                { value: 'out', label: 'You paid', icon: <ArrowUpRightIcon size={16} /> },
+                { value: 'in', label: 'They paid', icon: <ArrowDownLeftIcon size={16} /> },
+              ]}
+            />
+            {amount > 0 && (
+              <p className="hint-line">
+                {direction === 'out' ? (
+                  <>{displayName ? `${displayName} owes you` : "You'll be owed"} <strong>{rupees(amount)}</strong></>
+                ) : (
+                  <>{displayName ? `You owe ${displayName}` : "You'll owe"} <strong>{rupees(amount)}</strong></>
+                )}
               </p>
+            )}
+          </div>
+
+          <div className="field-block">
+            <span className="field-label">Person</span>
+            <PersonSelect
+              value={personValue}
+              onChange={setPersonValue}
+              suggestions={suggestions}
+              placeholder={draft.selfPayment ? 'Select who sent it' : 'Select a person'}
+              onOpenChange={setPickerOpen}
+            />
+            {!personValue.personId && displayName && (
+              <p className="new-person-hint">A new person will be created.</p>
             )}
             {selectedPerson && previousBalance != null && nextBalance != null && (
-              <p className="record-note">
-                <CheckIcon size={14} />
-                <span>
-                  Purana khata mila: <strong>{signedRupees(previousBalance)}</strong>
-                  {previousBalance === 0 ? ' (clear)' : ''} → ab <strong>{signedRupees(nextBalance)}</strong>
-                </span>
-              </p>
+              <div className="balance-preview">
+                <span>Balance with {selectedPerson.name.split(' ')[0]}</span>
+                <strong className={nextBalance > 0.009 ? 'is-pos' : nextBalance < -0.009 ? 'is-neg' : 'is-clear'}>
+                  {balanceText(selectedPerson.name, nextBalance)}
+                </strong>
+              </div>
             )}
           </div>
 
-          <div className="field-block">
-            <span className="field-label">Kis baare mein?</span>
-            <input
-              className="field field-input"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Chai, auto, kiraya…"
-              maxLength={60}
-            />
-          </div>
-
-          <div className="field-block">
-            <span className="field-label">Kya tha?</span>
-            <div className="chip-scroll chip-scroll--wrap">
-              {CATEGORIES.map((c) => (
-                <button
-                  type="button"
-                  key={c.id}
-                  className={`chip ${category === c.id ? 'is-active' : ''}`}
-                  onClick={() => setCategory(c.id)}
-                >
-                  <CategoryIcon id={c.id} size={15} />
-                  {c.label}
-                </button>
-              ))}
+          <details className="more-details">
+            <summary>Add note, category or date</summary>
+            <div className="more-body">
+              <div className="field-block">
+                <span className="field-label">Note</span>
+                <input
+                  className="field field-input"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Dinner, cab, rent…"
+                  maxLength={60}
+                />
+              </div>
+              <div className="field-block">
+                <span className="field-label">Category</span>
+                <div className="chip-scroll chip-scroll--wrap">
+                  {CATEGORIES.map((c) => (
+                    <button
+                      type="button"
+                      key={c.id}
+                      className={`chip ${category === c.id ? 'is-active' : ''}`}
+                      onClick={() => setCategory(c.id)}
+                    >
+                      <CategoryIcon id={c.id} size={15} />
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="field-block">
+                <span className="field-label">Date</span>
+                <input
+                  type="date"
+                  className="field field-input"
+                  value={dateText}
+                  max={dateKey(new Date())}
+                  onChange={(e) => setDateText(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
-
-          <div className="field-row">
-            <div className="field-block grow">
-              <span className="field-label">Kab?</span>
-              <input
-                type="date"
-                className="field field-input"
-                value={dateText}
-                max={dateKey(new Date())}
-                onChange={(e) => setDateText(e.target.value)}
-              />
-            </div>
-            {preview && (
-              <button type="button" className="thumb-button" onClick={() => setShowPreview(true)} aria-label="Screenshot dekho">
-                <img src={preview} alt="Screenshot" />
-              </button>
-            )}
-          </div>
+          </details>
         </section>
 
         {rawText && (
           <details className="raw-details">
-            <summary>Screen par kya likha tha</summary>
+            <summary>View extracted text</summary>
             <pre>{rawText}</pre>
           </details>
         )}
 
         {!pickerOpen && (
           <div className="review-cta">
-            <button type="button" className="btn btn-primary btn-block btn-save" onClick={save}>
-              <CheckIcon size={19} /> Hisaab mein daalo
+            <button type="button" className="btn btn-primary btn-block" onClick={save}>
+              <CheckIcon size={18} /> Save expense
             </button>
           </div>
         )}
@@ -550,7 +589,7 @@ export function ScanPage({ route }: { route: Route }) {
           createPortal(
             <div className="lightbox" role="dialog" aria-modal="true" aria-label="Screenshot" onClick={() => setShowPreview(false)}>
               <img src={preview} alt="Screenshot" />
-              <button type="button" className="lightbox-close" aria-label="Band karo">
+              <button type="button" className="lightbox-close" aria-label="Close">
                 <CloseIcon size={22} />
               </button>
             </div>,
@@ -564,30 +603,29 @@ export function ScanPage({ route }: { route: Route }) {
   return (
     <div className="page page--scan">
       <header className="topbar">
-        <div>
-          <h1 className="page-title">Naya hisaab</h1>
-          <p className="page-sub">Screenshot, chat ya khud likho</p>
-        </div>
-        <span className="smart-badge">
-          <SparkleIcon size={14} /> Smart
-        </span>
+        <button type="button" className="icon-btn" onClick={() => navigate('home')} aria-label="Back">
+          <ChevronLeftIcon size={22} />
+        </button>
+        <span className="topbar-title">Add expense</span>
+        <span className="topbar-spacer" />
       </header>
 
-      <Segmented
-        value={mode}
-        onChange={switchMode}
-        ariaLabel="Hisaab kaise daalein"
-        options={[
-          { value: 'image', label: 'Screenshot', icon: <ImageIcon size={16} /> },
-          { value: 'text', label: 'Chat / SMS', icon: <ClipboardIcon size={16} /> },
-          { value: 'manual', label: 'Khud', icon: <PlusIcon size={16} /> },
-        ]}
-      />
+      <div className="mode-tabs">
+        <button type="button" className={`mode-tab ${mode === 'image' ? 'is-active' : ''}`} aria-pressed={mode === 'image'} onClick={() => switchMode('image')}>
+          <ImageIcon size={18} /> Screenshot
+        </button>
+        <button type="button" className={`mode-tab ${mode === 'text' ? 'is-active' : ''}`} aria-pressed={mode === 'text'} onClick={() => switchMode('text')}>
+          <ClipboardIcon size={18} /> Message
+        </button>
+        <button type="button" className={`mode-tab ${mode === 'manual' ? 'is-active' : ''}`} aria-pressed={mode === 'manual'} onClick={() => switchMode('manual')}>
+          <PlusIcon size={18} /> Manual
+        </button>
+      </div>
 
       {error && (
         <div className="error-box">
           <span>{error}</span>
-          <button type="button" onClick={() => setError('')} aria-label="Band karo">
+          <button type="button" onClick={() => setError('')} aria-label="Dismiss">
             <CloseIcon size={16} />
           </button>
         </div>
@@ -595,6 +633,11 @@ export function ScanPage({ route }: { route: Route }) {
 
       {mode === 'image' && (
         <>
+          <div className="scan-intro">
+            <h1>Upload a screenshot</h1>
+            <p>A payment receipt, UPI app or bank alert.</p>
+          </div>
+
           <div
             className={`dropzone ${dragging ? 'is-dragging' : ''}`}
             onDragOver={(e) => {
@@ -611,48 +654,37 @@ export function ScanPage({ route }: { route: Route }) {
           >
             {stage === 'reading' ? (
               <div className="reading">
-                {preview ? <img className="reading-thumb" src={preview} alt="Screenshot" /> : <div className="reading-thumb reading-thumb--empty" />}
+                <div className="reading-image">
+                  {preview ? <img className="reading-thumb" src={preview} alt="Screenshot" /> : <div className="reading-thumb reading-thumb--empty" />}
+                  <span className="scan-line" />
+                </div>
                 <div className="reading-body">
-                  <span className="reading-title">
-                    {progressText || 'Padh rahe hain…'}
-                    {progress > 0.02 && progress < 1 ? ` · ${Math.round(progress * 100)}%` : ''}
-                  </span>
+                  <span className="reading-title">{progressText || 'Reading the screenshot'}</span>
                   <div className="progress" aria-hidden="true">
                     <span style={{ width: `${Math.max(6, Math.round(progress * 100))}%` }} />
                   </div>
-                  <span className="reading-sub">Sab kuch aapke phone mein hi hota hai · pehli baar engine load hota hai</span>
+                  <span className="reading-sub">
+                    {progress > 0.02 && progress < 0.97 ? `${Math.round(progress * 100)}% · ` : ''}
+                    Photos can take a few seconds. Nothing leaves your phone.
+                  </span>
                 </div>
               </div>
             ) : (
               <>
-                <div className="dropzone-art">
-                  <span className="dropzone-phone">
-                    <span className="dropzone-line" />
-                    <span className="dropzone-line short" />
-                    <span className="dropzone-amount" />
-                    <span className="dropzone-check">
-                      <CheckIcon size={15} />
-                    </span>
-                  </span>
-                  <span className="dropzone-spark">
-                    <SparkleIcon size={20} />
-                  </span>
+                <div className="dropzone-icon">
+                  <ImageIcon size={28} />
                 </div>
-                <h2 className="dropzone-title">Payment ka screenshot bhejo</h2>
-                <p className="dropzone-sub">
-                  GPay, PhonePe, Paytm, BHIM, bank SMS — naam aur amount khud nikal lega.
-                </p>
+                <h2 className="dropzone-title">Choose a payment screenshot</h2>
+                <p className="dropzone-sub">GPay, PhonePe, Paytm, BHIM or a bank message.</p>
                 <div className="dropzone-actions">
                   <button type="button" className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>
-                    <UploadIcon size={18} /> Gallery se chuno
+                    <UploadIcon size={18} /> Choose image
                   </button>
                   <button type="button" className="btn btn-outline" onClick={() => cameraInputRef.current?.click()}>
                     <CameraIcon size={18} /> Camera
                   </button>
                 </div>
-                <p className="dropzone-hint">
-                  Ya screenshot clipboard se paste karo (Ctrl / ⌘ + V) · drag-drop bhi chalta hai
-                </p>
+                <p className="dropzone-hint">You can also drag, drop or paste (Ctrl/Cmd + V)</p>
               </>
             )}
           </div>
@@ -681,39 +713,38 @@ export function ScanPage({ route }: { route: Route }) {
             }}
           />
 
-          <div className="capability-card">
-            <div className="capability-head">
-              <SparkleIcon size={16} /> Yeh apps padh sakta hoon
-            </div>
-            <div className="app-logos">
-              {['GPay', 'PhonePe', 'Paytm', 'BHIM', 'Amazon Pay', 'Bank SMS', 'WhatsApp'].map((a) => (
-                <span key={a} className="app-logo">
-                  {a}
-                </span>
-              ))}
-            </div>
+          <div className="app-chips" aria-label="Supported apps">
+            {['GPay', 'PhonePe', 'Paytm', 'BHIM', 'Bank SMS'].map((a) => (
+              <span key={a} className="app-chip">
+                {a}
+              </span>
+            ))}
           </div>
+
+          <p className="scan-privacy">Screenshots are read on this device only.</p>
         </>
       )}
 
       {mode === 'text' && (
         <>
-          <div className="text-card">
-            <label className="field-label" htmlFor="chat-input">
-              Message ya SMS paste karo
-            </label>
+          <div className="scan-intro">
+            <h1>Paste a message</h1>
+            <p>A UPI SMS, bank alert or chat message.</p>
+          </div>
+
+          <div className="card text-card">
             <textarea
-              id="chat-input"
               ref={textAreaRef}
               className="text-area"
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
-              placeholder={'Jaise:\nRahul: bhai 500 rupaye bhej de\n\nYa bank SMS:\nRs.500 debited from A/c XX1234 to VPA rahul@okaxis'}
+              placeholder={'e.g. Rs.500 debited to Rahul Sharma\nor: Paid ₹250 to Priya Verma'}
               rows={7}
+              aria-label="Message text"
             />
             <div className="text-actions">
               <button type="button" className="btn btn-primary grow" onClick={() => runTextParse()}>
-                <SparkleIcon size={18} /> Samjho
+                <SparkleIcon size={18} /> Read message
               </button>
               <button
                 type="button"
@@ -722,13 +753,13 @@ export function ScanPage({ route }: { route: Route }) {
                   try {
                     const text = await navigator.clipboard.readText();
                     if (!text.trim()) {
-                      toast('Clipboard khaali hai');
+                      toast('Clipboard is empty');
                       return;
                     }
                     setRawText(text);
                     runTextParse(text);
                   } catch {
-                    toast('Clipboard padhne ki permission nahi mili — paste kar do');
+                    toast('Clipboard access was blocked — paste it instead');
                   }
                 }}
               >
@@ -738,7 +769,7 @@ export function ScanPage({ route }: { route: Route }) {
           </div>
 
           <div className="samples">
-            <span className="samples-label">Try karne ke liye:</span>
+            <span className="samples-label">Try an example</span>
             <div className="chip-scroll">
               {SAMPLES.map((s) => (
                 <button
@@ -755,33 +786,23 @@ export function ScanPage({ route }: { route: Route }) {
               ))}
             </div>
           </div>
+
+          <p className="scan-privacy">Works with English and Hinglish messages.</p>
         </>
       )}
 
       {mode === 'manual' && (
-        <div className="manual-card">
-          <div className="manual-art">
+        <div className="card manual-card">
+          <div className="manual-icon">
             <PlusIcon size={26} />
           </div>
-          <h2>Khud hisaab likho</h2>
-          <p>Amount, banda aur kisne diye — bas teen cheezein. Baaki optional.</p>
+          <h2>Enter it manually</h2>
+          <p>Type the amount, choose a person, and save.</p>
           <button type="button" className="btn btn-primary btn-block" onClick={startManual}>
-            Form kholo
+            Open form
           </button>
         </div>
       )}
-
-      <div className="scan-help">
-        <div className="scan-help-item">
-          <span>
-            <SparkleIcon size={16} />
-          </span>
-          <p>
-            <strong>Kya kaam karta hai:</strong> paisa kisne diya, kitna, kis bande ka, kis date ka — sab khud
-            pehchanta hai. Purane khate mein add karta hai, naya banda ho toh naya khata banata hai.
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

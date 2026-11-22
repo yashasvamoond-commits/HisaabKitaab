@@ -1,5 +1,5 @@
 /* HisaabKitaab service worker: offline app shell + Android share-target inbox. */
-const VERSION = 'hk-v1';
+const VERSION = 'hk-v2';
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 const SHARE_CACHE = 'hk-share-inbox';
@@ -90,7 +90,7 @@ self.addEventListener('fetch', (event) => {
           if (cached) return cached;
           const shell = await caches.match(scopeUrl('index.html'));
           if (shell) return shell;
-          return new Response('Offline. HisaabKitaab ko ek baar online khol lijiye.', {
+          return new Response("You're offline. Open HisaabKitaab once while online to finish setting it up.", {
             status: 503,
             headers: { 'Content-Type': 'text/plain; charset=utf-8' },
           });

@@ -18,6 +18,24 @@ const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
 await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+
+// Seed a small state so the tab bar (and the badge offset) is on screen.
+await page.evaluate(() => {
+  const now = new Date().toISOString();
+  localStorage.setItem(
+    'hisaabkitaab.v1',
+    JSON.stringify({
+      version: 1,
+      profile: { name: 'Yashasva Moond', createdAt: now },
+      settings: { onboarded: true, sound: true },
+      persons: [{ id: 'p1', name: 'Rahul Sharma', color: 'clay', createdAt: now }],
+      txns: [
+        { id: 't1', personId: 'p1', direction: 'out', amount: 250, note: 'Chai and samosa', category: 'food', date: now, source: 'manual', createdAt: now },
+      ],
+    }),
+  );
+});
+await page.reload({ waitUntil: 'networkidle2', timeout: 60000 });
 await new Promise((resolve) => setTimeout(resolve, 1500));
 
 const cdp = await page.createCDPSession();
@@ -36,14 +54,20 @@ const info = await page.evaluate(() => {
     rect.top < tabbar.bottom &&
     rect.bottom > tabbar.top
   );
+  const badgeOverlapsContent = (() => {
+    if (!rect) return false;
+    const target = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return !!target && !badge.contains(target);
+  })();
   return {
     host: document.documentElement.dataset.host || '',
     overlapsTabbar,
+    badgeOverlapsContent,
     title: document.title,
     hasServiceWorker: 'serviceWorker' in navigator,
     controlled: !!navigator.serviceWorker?.controller,
     manifestHref: document.querySelector('link[rel="manifest"]')?.getAttribute('href'),
-    displayMode: getComputedStyle(document.documentElement).getPropertyValue('--font-display').trim() ? 'styled' : 'plain',
+    styled: !!getComputedStyle(document.documentElement).getPropertyValue('--font').trim(),
     badge: badge
       ? {
           text: badge.textContent?.trim(),
@@ -51,7 +75,8 @@ const info = await page.evaluate(() => {
           rect: rect ? { top: Math.round(rect.top), left: Math.round(rect.left), width: Math.round(rect.width), height: Math.round(rect.height) } : null,
         }
       : null,
-    hero: document.querySelector('.hero')?.textContent?.replace(/\s+/g, ' ').trim().slice(0, 80) || null,
+    heading: document.querySelector('.balance-title, .onboarding-hero h1')?.textContent?.replace(/\s+/g, ' ').trim().slice(0, 80) || null,
+    tabbar: !!tabbar,
   };
 });
 

@@ -56,10 +56,9 @@ export function dayLabel(d: Date | string): string {
   const today = startOfDay(new Date());
   const that = startOfDay(date);
   const diff = Math.round((today.getTime() - that.getTime()) / 86400000);
-  if (diff === 0) return 'Aaj';
-  if (diff === 1) return 'Kal';
-  if (diff === 2) return 'Parso';
-  if (diff > 2 && diff < 7) return `${diff} din pehle`;
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  if (diff > 1 && diff < 7) return `${diff} days ago`;
   return `${date.getDate()} ${MONTHS[date.getMonth()]}${
     date.getFullYear() !== new Date().getFullYear() ? ` ${String(date.getFullYear()).slice(2)}` : ''
   }`;

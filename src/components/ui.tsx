@@ -24,7 +24,7 @@ export function Avatar({
         background: color.bg,
         color: color.fg,
         fontSize: Math.max(11, size * 0.34),
-        borderRadius: radius ?? Math.round(size * 0.36),
+        borderRadius: radius ?? Math.round(size / 2),
       }}
       aria-hidden="true"
     >
@@ -112,7 +112,7 @@ export function Sheet({
               {title && <h2 className="sheet-title">{title}</h2>}
               {subtitle && <p className="sheet-sub">{subtitle}</p>}
             </div>
-            <button type="button" className="icon-btn" onClick={onClose} aria-label="Band karo">
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon size={20} />
             </button>
           </div>
@@ -129,8 +129,8 @@ export function ConfirmSheet({
   open,
   title,
   body,
-  confirmLabel = 'Haan, kar do',
-  cancelLabel = 'Nahi, rehne do',
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
   danger = false,
   onConfirm,
   onClose,

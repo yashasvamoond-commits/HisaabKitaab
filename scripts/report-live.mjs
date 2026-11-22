@@ -6,6 +6,8 @@ if (!existsSync(process.argv[2])) {
 }
 const data = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 const note = (title, value) => console.log(`::notice title=${title}::${String(value).replace(/\n/g, ' ').slice(0, 900)}`);
-note('Live OCR review', JSON.stringify(data.review));
-note('Live save', JSON.stringify(data.saved));
+note('Outgoing review', JSON.stringify(data.outgoingReview));
+note('Outgoing save', JSON.stringify(data.afterOutgoing));
+note('Incoming review', JSON.stringify(data.incomingReview));
+note('Incoming save', JSON.stringify(data.afterIncoming));
 note('Live errors', JSON.stringify(data.errors));

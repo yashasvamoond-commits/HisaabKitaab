@@ -59,7 +59,7 @@ export async function consumeShare(): Promise<SharedPayload | null> {
   }
 }
 
-/** Builds a WhatsApp-friendly reminder in Hinglish. */
+/** Builds a short, polite WhatsApp reminder. */
 export function reminderText(opts: {
   selfName: string;
   personName: string;
@@ -69,9 +69,9 @@ export function reminderText(opts: {
   const who = opts.personName.split(' ')[0];
   const amount = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(opts.amount);
   if (opts.direction === 'out') {
-    return `Namaste ${who}! Chhota sa reminder — ₹${amount} ka hisaab baaki hai. Jab time mile tab bhej dena 🙂\n\n— ${opts.selfName || 'Aap'}, HisaabKitaab se`;
+    return `Hi ${who}, a quick reminder that ₹${amount} is still pending from our shared expenses. No rush — whenever it works for you.\n\n— ${opts.selfName || 'You'}, via HisaabKitaab`;
   }
-  return `Namaste ${who}! ₹${amount} ka hisaab main jaldi clear kar dunga 🙂\n\n— ${opts.selfName || 'Aap'}, HisaabKitaab se`;
+  return `Hi ${who}, I'll clear the ₹${amount} I owe you shortly. Thanks for covering it!\n\n— ${opts.selfName || 'You'}, via HisaabKitaab`;
 }
 
 export function downloadJson(state: AppState) {

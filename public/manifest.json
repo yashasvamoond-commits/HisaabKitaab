@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "HisaabKitaab — apna hisaab, apni zubaani",
-  "short_name": "Hisaab",
-  "description": "Doston, family aur dukaandaar ke saath hisaab. Screenshot ya chat bhejo, khata apne aap ban jaata hai.",
+  "name": "HisaabKitaab — Shared expenses",
+  "short_name": "HisaabKitaab",
+  "description": "Track shared expenses, add payment screenshots and keep every balance up to date.",
   "lang": "en-IN",
   "dir": "ltr",
   "start_url": "./?src=pwa",
@@ -10,8 +10,8 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
-  "background_color": "#FFF8EE",
-  "theme_color": "#FFF8EE",
+  "background_color": "#F4F5F7",
+  "theme_color": "#F4F5F7",
   "categories": ["finance", "productivity", "utilities"],
   "icons": [
     {
@@ -35,20 +35,20 @@
   ],
   "shortcuts": [
     {
-      "name": "Screenshot se hisaab",
+      "name": "Add from screenshot",
       "short_name": "Screenshot",
       "url": "./#/scan?mode=image",
-      "description": "Payment screenshot padho aur hisaab mein daalo"
+      "description": "Read a payment screenshot and save the expense"
     },
     {
-      "name": "Chat se hisaab",
-      "short_name": "Chat",
+      "name": "Add from message",
+      "short_name": "Message",
       "url": "./#/scan?mode=text",
-      "description": "WhatsApp ya SMS ka message paste karo"
+      "description": "Paste a UPI SMS or chat message"
     },
     {
-      "name": "Sabka hisaab",
-      "short_name": "Log",
+      "name": "People",
+      "short_name": "People",
       "url": "./#/people"
     }
   ],

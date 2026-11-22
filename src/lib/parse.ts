@@ -26,6 +26,10 @@ export interface ParsedDraft {
   rawText: string;
   source: Source;
   app?: string;
+  /** True when the receipt shows money paid *to* you (e.g. "Paid to <your name>"). */
+  selfPayment?: boolean;
+  /** What told us the amount was money (₹, Rs, plain number...). */
+  amountMarker?: string;
 }
 
 export interface ParseOptions {
@@ -136,7 +140,7 @@ function scoreAmount(
   const window = text.slice(Math.max(0, index - 70), index + raw.length + 70).toLowerCase();
   if (/(?:paid|pay|sent|send|received|receive|transfer|debited|credited|payment|amount|diye|diya|liye|liya|bheja|bheje)/.test(window)) score += 2;
   if (raw.includes('.') || raw.includes(',')) score += 0.6;
-  if (/(?:₹|rs|inr)/i.test(marker)) score += 0.8;
+  if (/(?:₹|€|£|¥|¢|©|®|rs|inr)/i.test(marker)) score += 0.8;
   // Number sitting inside a date / phone / id string
   const prev = text[index - 1] || '';
   const next = text[index + raw.length] || '';
@@ -155,12 +159,16 @@ function extractAmounts(text: string): AmountHit[] {
   };
 
   // ₹ / Rs / INR before number
-  for (const m of text.matchAll(new RegExp(String.raw`(?:₹|\brs\.?|\binr|\b rupees?|\brupaye)\s*(${NUM})`, 'gi'))) {
+  for (const m of text.matchAll(new RegExp(String.raw`(?:₹|€|£|¥|¢|©|®|\brs\.?|\binr|\b rupees?|\brupaye)\s*(${NUM})`, 'gi'))) {
     const marker = m[0].slice(0, m[0].indexOf(m[1])).trim();
-    push(m[1], (m.index ?? 0) + m[0].indexOf(m[1]), marker, /₹/.test(marker) ? 3.2 : 2.6);
+    push(m[1], (m.index ?? 0) + m[0].indexOf(m[1]), marker, /[₹€£¥¢©®]/.test(marker) ? 3.2 : 2.6);
+  }
+  // OCR often turns ₹ into # ("#19,200"); only trust it with grouping.
+  for (const m of text.matchAll(/#\s*(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?)/g)) {
+    push(m[1], (m.index ?? 0) + m[0].indexOf(m[1]), '#', 3.2);
   }
   // number then ₹ / Rs / rupees
-  for (const m of text.matchAll(new RegExp(String.raw`(${NUM})\s*(?:₹|\brs\.?\b|\binr\b|\brupees?\b|\brupaye\b)`, 'gi'))) {
+  for (const m of text.matchAll(new RegExp(String.raw`(${NUM})\s*(?:₹|€|£|¥|¢|©|®|\brs\.?\b|\binr\b|\brupees?\b|\brupaye\b)`, 'gi'))) {
     push(m[1], m.index ?? 0, 'suffix', 2.2);
   }
   // "amount of 500", "paid 500", "sent 500"
@@ -280,8 +288,8 @@ function extractDirection(text: string): { direction: DirectionGuess; out: numbe
   const total = out + inbound;
   if (!total || Math.abs(out - inbound) < 1) return { direction: 'unknown', out, in: inbound };
   return out > inbound
-    ? { direction: 'out', out, in: inbound, reason: 'Aapne paise diye' }
-    : { direction: 'in', out, in: inbound, reason: 'Unhone paise diye' };
+    ? { direction: 'out', out, in: inbound, reason: 'You paid' }
+    : { direction: 'in', out, in: inbound, reason: 'They paid you' };
 }
 
 /* ------------------------------------------------------------------ */
@@ -464,18 +472,53 @@ export function matchPerson(
   return best;
 }
 
+function nameTokens(name: string): string[] {
+  return normalizeName(name)
+    .split(' ')
+    .filter((t) => t.length > 1);
+}
+
+/** True when one name is a word-subset of the other ("Yashasva" vs "Yashasva Moond"). */
+export function isSelfName(candidate: string, selfName?: string): boolean {
+  if (!selfName) return false;
+  const a = nameTokens(candidate);
+  const b = nameTokens(selfName);
+  if (!a.length || !b.length) return false;
+  if (a.join(' ') === b.join(' ')) return true;
+  const [small, large] = a.length <= b.length ? [a, b] : [b, a];
+  return small.every((t) => large.includes(t));
+}
+
+function sharesSelfToken(candidate: string, selfName?: string): boolean {
+  if (!selfName) return false;
+  const a = nameTokens(candidate);
+  const b = nameTokens(selfName);
+  return a.some((t) => t.length >= 4 && b.includes(t));
+}
+
+/**
+ * OCR frequently reads the ₹ glyph as a leading "2" (₹19,200 -> 219,200).
+ * When that padded number also appears without the leading digit in the same
+ * receipt, put the currency marker back on the shorter copy.
+ */
+function repairCurrencyMisread(text: string): string {
+  return text.replace(/(^|[\s(])2(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?)(?=$|[\s).,;|])/g, (match, pre: string, num: string) => {
+    const escaped = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^\\d.,])${escaped}(?!\\d)`).test(text) ? `${pre}₹${num}` : match;
+  });
+}
+
 function resolveCandidates(
   raw: CandidateInternal[],
   selfName: string | undefined,
   persons: Person[],
 ): PersonHint[] {
-  const self = selfName ? normalizeName(selfName) : '';
   const merged = new Map<string, PersonHint>();
 
   for (const c of raw) {
     const key = normalizeName(c.name);
     if (!key) continue;
-    if (self && (key === self || key === normalizeName(self.split(' ')[0] || ''))) continue;
+    if (isSelfName(c.name, selfName)) continue;
     if (BAD_NAME_WORDS.has(key)) continue;
 
     const match = matchPerson({ name: c.name, upi: c.upi }, persons);
@@ -608,12 +651,12 @@ export function inferCategory(text: string): { category: Category; note?: string
         petrol: 'Petrol',
         auto: 'Auto',
         cab: 'Cab',
-        rent: 'Kiraya',
-        electricity: 'Bijli bill',
+        rent: 'Rent',
+        electricity: 'Electricity bill',
         recharge: 'Recharge',
-        medicine: 'Dawai',
+        medicine: 'Medicine',
         movie: 'Movie',
-        kirana: 'Kirana',
+        kirana: 'Groceries',
         swiggy: 'Swiggy',
         zomato: 'Zomato',
       };
@@ -643,7 +686,9 @@ export function parseTransaction(rawInput: string, opts: ParseOptions = {}): Par
   const now = opts.now || new Date();
   const persons = opts.persons || [];
   const source = opts.source || 'chat';
-  const text = rawText.replace(/[ \t]+/g, ' ');
+  let text = rawText.replace(/[ \t]+/g, ' ');
+  // Only OCR output gets the ₹/2 repair; typed messages may legitimately contain both figures.
+  if (source === 'screenshot') text = repairCurrencyMisread(text);
   const signals: string[] = [];
 
   if (!text) {
@@ -663,36 +708,58 @@ export function parseTransaction(rawInput: string, opts: ParseOptions = {}): Par
   }
 
   const app = detectApp(text);
-  if (app) signals.push(`${app} se aaya`);
+  if (app) signals.push(`${app} detected`);
 
   const amounts = extractAmounts(text);
   const amount = amounts.length ? amounts[0].value : null;
-  if (amount != null) signals.push(`₹${formatInr(amount)} mila`);
+  if (amount != null) signals.push(`Amount ₹${formatInr(amount)}`);
 
   const dir = extractDirection(text);
-  const candidates = resolveCandidates(extractNameCandidates(text), opts.selfName, persons);
+  const rawCandidates = extractNameCandidates(text);
+
+  // "Paid to <my own name>" means the money actually came *in*.
+  const paidToLine = text.match(/\b(?:paid|pay|payment|sent|transfer(?:red)?)\s*to\b[^\p{L}]{0,40}([\p{L}][\p{L}.'\s-]{2,42})/iu);
+  const paidToSelf = paidToLine ? isSelfName(stripName(paidToLine[1]) || '', opts.selfName) : false;
+  const labelledSelf = rawCandidates.some(
+    (c) =>
+      isSelfName(c.name, opts.selfName) &&
+      /^(?:paid to|pay to|payment to|sent to|send money to|transferred to|money sent to|paid you)$/.test(c.method),
+  );
+  // UPI handles survive OCR better than full names: adv.yashasva@ibl.
+  const upiSelf = [...text.matchAll(/\b([a-z0-9][a-z0-9._-]{1,30})@([a-z][a-z0-9]{1,20})\b/gi)].some((m) =>
+    sharesSelfToken(m[1].replace(/[._-]+/g, ' '), opts.selfName),
+  );
+  const paidToLabel = /\b(?:paid|pay|payment|sent|transfer(?:red)?)\s*to\b/i.test(text);
+  const selfPayment = paidToSelf || labelledSelf || (upiSelf && paidToLabel);
+
+  let candidates = resolveCandidates(rawCandidates, opts.selfName, persons);
 
   let direction = dir.direction;
   let dirReason = dir.reason;
-  if (direction === 'unknown' && candidates.length) {
+  if (selfPayment) {
+    direction = 'in';
+    dirReason = 'Paid to you';
+  } else if (direction === 'unknown' && candidates.length) {
     const methods = candidates.map((c) => c.method).join(' ');
     if (/\b(?:paid\s+to|pay\s+to|payment\s+to|sent\s+to|transferred\s+to|to)\b/.test(methods)) {
       direction = 'out';
-      dirReason = 'Naam ke hisaab se: aapne diye';
+      dirReason = 'Matched from the name: you paid';
     } else if (/\b(?:received\s+from|credited\s+from|paid\s+by|from)\b/.test(methods)) {
       direction = 'in';
-      dirReason = 'Naam ke hisaab se: unhone diye';
+      dirReason = 'Matched from the name: they paid';
     }
   }
   if (dirReason) signals.push(dirReason);
 
+  // The screenshot only names the receiver (me); the payer is unknown.
+  if (selfPayment) candidates = [];
   const person = candidates[0] || null;
   if (person) {
-    signals.push(person.personId ? `${person.name} pehchana` : `${person.name} — naya naam`);
+    signals.push(person.personId ? `${person.name} matched` : `${person.name} · new person`);
   }
 
   const { date, explicit } = extractDate(text, now);
-  if (explicit) signals.push('Date mil gayi');
+  if (explicit) signals.push('Date found');
 
   const cat = inferCategory(text);
   let note = cat.note || '';
@@ -729,6 +796,8 @@ export function parseTransaction(rawInput: string, opts: ParseOptions = {}): Par
     rawText,
     source,
     app,
+    ...(amounts.length ? { amountMarker: amounts[0].marker } : {}),
+    ...(selfPayment ? { selfPayment: true } : {}),
   };
 }
 

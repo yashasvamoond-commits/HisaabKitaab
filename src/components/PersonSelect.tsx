@@ -15,12 +15,14 @@ export function PersonSelect({
   onChange,
   suggestions = [],
   autoOpen = false,
+  placeholder = 'Select a person',
   onOpenChange,
 }: {
   value: PersonValue;
   onChange: (v: PersonValue) => void;
   suggestions?: { personId?: string; name: string; score?: number }[];
   autoOpen?: boolean;
+  placeholder?: string;
   onOpenChange?: (open: boolean) => void;
 }) {
   const { persons, txns } = useApp();
@@ -34,7 +36,9 @@ export function PersonSelect({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = persons.filter((p) => !q || p.name.toLowerCase().includes(q) || p.aliases.some((a) => a.toLowerCase().includes(q)));
+    const list = persons.filter(
+      (p) => !q || p.name.toLowerCase().includes(q) || p.aliases.some((a) => a.toLowerCase().includes(q)),
+    );
     return list.slice(0, 8);
   }, [persons, query]);
 
@@ -56,6 +60,14 @@ export function PersonSelect({
     });
   };
 
+  const balanceText = (id: string) => {
+    const bal = balanceOf(id, txns);
+    if (Math.abs(bal) < 0.009) return { text: 'Settled up', tone: 'clear' };
+    return bal > 0
+      ? { text: `Owes you ${rupees(bal)}`, tone: 'pos' }
+      : { text: `You owe ${rupees(Math.abs(bal))}`, tone: 'neg' };
+  };
+
   return (
     <div className="person-select">
       <button
@@ -66,21 +78,19 @@ export function PersonSelect({
           setTimeout(() => inputRef.current?.focus(), 60);
         }}
         aria-expanded={open}
+        aria-label="Person"
       >
         {displayName ? (
-          <Avatar name={displayName} size={34} />
+          <Avatar name={displayName} size={32} />
         ) : (
-          <span className="person-field-empty">
+          <span className="person-field-icon">
             <SearchIcon size={17} />
           </span>
         )}
-        <span className="person-field-text">
-          <span className="person-field-label">Kiska hisaab?</span>
-          <span className={`person-field-name ${!displayName ? 'is-empty' : ''}`}>
-            {displayName || 'Naam se dhoondo ya naya banao'}
-          </span>
+        <span className={`person-field-name ${!displayName ? 'is-empty' : ''}`}>
+          {displayName || placeholder}
         </span>
-        {isNew && <span className="tag tag--saffron">naya</span>}
+        {isNew && <span className="tag">New</span>}
         <ChevronRightIcon size={18} className={`chev ${open ? 'is-open' : ''}`} />
       </button>
 
@@ -92,7 +102,7 @@ export function PersonSelect({
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Naam likho…"
+              placeholder="Search or add a person"
               autoComplete="off"
               enterKeyHint="done"
               onKeyDown={(e) => {
@@ -110,39 +120,42 @@ export function PersonSelect({
             />
             {query && (
               <button type="button" className="text-btn" onClick={() => setQuery('')}>
-                saaf
+                Clear
               </button>
             )}
           </div>
 
           {!query && suggestionPeople.length > 0 && (
             <div className="panel-label">
-              <SparkleIcon size={14} /> Screenshot se mila
+              <SparkleIcon size={13} /> Suggested
             </div>
           )}
 
           {!query &&
-            suggestionPeople.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className="person-option is-suggested"
-                onClick={() => {
-                  onChange({ personId: p.id });
-                  setPanel(false);
-                }}
-              >
-                <Avatar name={p.name} size={34} />
-                <span className="person-option-name">{p.name}</span>
-                <span className="person-option-bal">{rupees(balanceOf(p.id, txns))}</span>
-              </button>
-            ))}
+            suggestionPeople.map((p) => {
+              const bal = balanceText(p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="person-option is-suggested"
+                  onClick={() => {
+                    onChange({ personId: p.id });
+                    setPanel(false);
+                  }}
+                >
+                  <Avatar name={p.name} size={34} />
+                  <span className="person-option-name">{p.name}</span>
+                  <span className={`person-option-bal is-${bal.tone}`}>{bal.text}</span>
+                </button>
+              );
+            })}
 
           {filtered.length > 0 && (
-            <div className="panel-label">{query ? 'Milte-julte log' : 'Aapke log'}</div>
+            <div className="panel-label">{query ? 'Matches' : 'Your people'}</div>
           )}
           {filtered.map((p) => {
-            const bal = balanceOf(p.id, txns);
+            const bal = balanceText(p.id);
             return (
               <button
                 key={p.id}
@@ -159,15 +172,13 @@ export function PersonSelect({
                   {p.name}
                   {p.upi && <em>{p.upi}</em>}
                 </span>
-                <span className={`person-option-bal ${bal > 0 ? 'is-out' : bal < 0 ? 'is-in' : ''}`}>
-                  {bal === 0 ? 'clear' : rupees(bal)}
-                </span>
+                <span className={`person-option-bal is-${bal.tone}`}>{bal.text}</span>
               </button>
             );
           })}
 
           {!filtered.length && query && (
-            <p className="panel-empty">“{query.trim()}” naam se koi nahi mila.</p>
+            <p className="panel-empty">No one matches “{query.trim()}”.</p>
           )}
 
           {query.trim() && !exact && (
@@ -184,14 +195,14 @@ export function PersonSelect({
                 <PlusIcon size={18} />
               </span>
               <span className="person-option-name">
-                Naya banda banao
+                Create new person
                 <em>{query.trim()}</em>
               </span>
             </button>
           )}
 
           {!query && !persons.length && (
-            <p className="panel-empty">Abhi koi banda nahi. Naam likh ke shuru karo.</p>
+            <p className="panel-empty">No people yet. Type a name to start.</p>
           )}
         </div>
       )}

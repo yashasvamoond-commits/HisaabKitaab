@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../lib/store';
 import { balanceOf } from '../lib/calc';
-import { dateKey, formatAmountInput, rupees, signedRupees } from '../lib/format';
+import { dateKey, formatAmountInput, rupees } from '../lib/format';
 import { parseAmountInput } from '../lib/parse';
 import { CATEGORIES, type Category, type Direction, type Person, type Txn } from '../lib/types';
 import { ArrowDownLeftIcon, ArrowUpRightIcon, CategoryIcon, TrashIcon } from './Icons';
 import { Avatar, Segmented, Sheet } from './ui';
 import { PersonSelect, type PersonValue } from './PersonSelect';
+
+function balanceSentence(name: string, balance: number): string {
+  if (Math.abs(balance) < 0.009) return `${name} is settled up`;
+  return balance > 0
+    ? `${name} owes you ${rupees(balance)}`
+    : `You owe ${name} ${rupees(Math.abs(balance))}`;
+}
 
 export function TxnSheet({
   open,
@@ -61,11 +68,11 @@ export function TxnSheet({
 
   const save = () => {
     if (!amount) {
-      toast('Pehle amount daalo');
+      toast('Enter an amount');
       return;
     }
     if (!personValue.personId && !personValue.name?.trim()) {
-      toast('Kiska hisaab hai? Naam chuno ya naya banao');
+      toast('Select a person');
       return;
     }
     const when = dateText ? new Date(`${dateText}T12:00:00`) : new Date();
@@ -79,7 +86,7 @@ export function TxnSheet({
         category,
         date: when.toISOString(),
       });
-      toast('Hisaab badal diya');
+      toast('Expense updated');
       onSaved?.(txn.id, nextPersonId);
     } else {
       const created = addTxn({
@@ -92,64 +99,30 @@ export function TxnSheet({
         date: when.toISOString(),
         source: 'manual',
       });
-      toast('Hisaab mein daal diya');
+      toast('Expense added');
       onSaved?.(created.id, created.personId);
     }
     onClose();
   };
 
-  const who = displayName || 'Yeh banda';
+  const who = displayName || 'they';
 
   return (
     <Sheet
       open={open}
       onClose={onClose}
       size="tall"
-      title={txn ? 'Hisaab badlo' : 'Naya hisaab'}
-      subtitle={person && !txn ? `${person.name} ke saath` : 'Screenshot, chat ya khud likh ke — sab chalta hai'}
+      title={txn ? 'Edit expense' : 'Add expense'}
+      subtitle={person && !txn ? `With ${person.name}` : 'Who paid, and who was it for?'}
       footer={
         <button type="button" className="btn btn-primary btn-block" onClick={save}>
-          {txn ? 'Badlav save karo' : 'Hisaab mein daalo'}
+          {txn ? 'Save changes' : 'Save expense'}
         </button>
       }
     >
       <div className="sheet-form">
-        {!person && (
-          <PersonSelect value={personValue} onChange={setPersonValue} autoOpen={!personValue.personId && !personValue.name && open && !txn} />
-        )}
-
-        {person && (
-          <div className="fixed-person">
-            <Avatar name={person.name} size={38} />
-            <div>
-              <span className="fixed-person-name">{person.name}</span>
-              <span className="fixed-person-bal">
-                Abhi: {signedRupees(balanceOf(person.id, txns))}
-              </span>
-            </div>
-          </div>
-        )}
-
         <div className="field-block">
-          <span className="field-label">Kisne paise diye?</span>
-          <Segmented
-            value={direction}
-            onChange={setDirection}
-            options={[
-              { value: 'out', label: 'Maine diye', icon: <ArrowUpRightIcon size={16} /> },
-              { value: 'in', label: 'Unhone diye', icon: <ArrowDownLeftIcon size={16} /> },
-            ]}
-          />
-          {amount > 0 && (
-            <p className="hint-line">
-              {direction === 'out' ? `${who} aapko` : `Aap ${who} ko`}{' '}
-              <strong>{rupees(amount)}</strong> {direction === 'out' ? 'dega' : 'denge'}
-            </p>
-          )}
-        </div>
-
-        <div className="field-block">
-          <span className="field-label">Kitne paise?</span>
+          <span className="field-label">Amount</span>
           <div className="amount-field">
             <span className="amount-currency">₹</span>
             <input
@@ -158,23 +131,71 @@ export function TxnSheet({
               value={amountText}
               onChange={(e) => setAmountText(e.target.value.replace(/[^\d.,]/g, ''))}
               aria-label="Amount"
+              placeholder="0"
+              autoFocus={!txn && !!person}
             />
           </div>
         </div>
 
         <div className="field-block">
-          <span className="field-label">Kis baare mein?</span>
+          <span className="field-label">Who paid?</span>
+          <Segmented
+            value={direction}
+            onChange={setDirection}
+            options={[
+              { value: 'out', label: 'You paid', icon: <ArrowUpRightIcon size={16} /> },
+              { value: 'in', label: 'They paid', icon: <ArrowDownLeftIcon size={16} /> },
+            ]}
+          />
+          {amount > 0 && (
+            <p className="hint-line">
+              {direction === 'out' ? (
+                <>{displayName ? `${who} owes you` : "You'll be owed"} <strong>{rupees(amount)}</strong></>
+              ) : (
+                <>{displayName ? `You owe ${who}` : "You'll owe"} <strong>{rupees(amount)}</strong></>
+              )}
+            </p>
+          )}
+        </div>
+
+        <div className="field-block">
+          <span className="field-label">Person</span>
+          {person && !txn ? (
+            <div className="fixed-person">
+              <Avatar name={person.name} size={36} />
+              <div className="fixed-person-main">
+                <span className="fixed-person-name">{person.name}</span>
+                <span className="fixed-person-bal">{balanceSentence(person.name, balanceOf(person.id, txns))}</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <PersonSelect value={personValue} onChange={setPersonValue} autoOpen={!person && !txn && open} />
+              {!personValue.personId && displayName && (
+                <p className="new-person-hint">A new person will be created.</p>
+              )}
+              {resolvedPerson && (
+                <p className="record-note">
+                  Current balance: {balanceSentence(resolvedPerson.name, balanceOf(resolvedPerson.id, txns))}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="field-block">
+          <span className="field-label">Note</span>
           <input
             className="field field-input"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Chai, auto, kiraya…"
+            placeholder="Dinner, cab, rent…"
             maxLength={60}
           />
         </div>
 
         <div className="field-block">
-          <span className="field-label">Kya tha?</span>
+          <span className="field-label">Category</span>
           <div className="chip-scroll chip-scroll--wrap">
             {CATEGORIES.map((c) => (
               <button
@@ -191,7 +212,7 @@ export function TxnSheet({
         </div>
 
         <div className="field-block">
-          <span className="field-label">Kab?</span>
+          <span className="field-label">Date</span>
           <input
             type="date"
             className="field field-input"
@@ -205,25 +226,25 @@ export function TxnSheet({
           <div className="danger-zone">
             {!confirmDelete ? (
               <button type="button" className="link-danger" onClick={() => setConfirmDelete(true)}>
-                <TrashIcon size={16} /> Yeh hisaab hatao
+                <TrashIcon size={16} /> Delete expense
               </button>
             ) : (
               <div className="danger-strip">
-                <span>Pakka hata dein?</span>
+                <span>Delete this expense?</span>
                 <div className="row gap-8">
                   <button type="button" className="btn btn-mini btn-ghost" onClick={() => setConfirmDelete(false)}>
-                    Nahi
+                    Cancel
                   </button>
                   <button
                     type="button"
                     className="btn btn-mini btn-danger"
                     onClick={() => {
                       deleteTxn(txn.id);
-                      toast('Hisaab hata diya');
+                      toast('Expense deleted');
                       onClose();
                     }}
                   >
-                    Haan, hatao
+                    Delete
                   </button>
                 </div>
               </div>

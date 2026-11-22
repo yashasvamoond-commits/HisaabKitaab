@@ -10,8 +10,7 @@ import { TxnSheet } from '../components/TxnSheet';
 import { PersonFormSheet } from '../components/PersonFormSheet';
 import { Avatar, ConfirmSheet, EmptyState } from '../components/ui';
 import {
-  ArrowDownLeftIcon,
-  ArrowUpRightIcon,
+  CheckIcon,
   ChevronLeftIcon,
   EditIcon,
   PlusIcon,
@@ -34,18 +33,19 @@ export function PersonDetailPage({ route }: { route: Route }) {
     return (
       <div className="page">
         <header className="topbar">
-          <button type="button" className="icon-btn" onClick={() => navigate('people')} aria-label="Wapas">
+          <button type="button" className="icon-btn" onClick={() => navigate('people')} aria-label="Back">
             <ChevronLeftIcon size={22} />
           </button>
-          <h1 className="page-title">Banda nahi mila</h1>
+          <span className="topbar-title">Person</span>
+          <span className="topbar-spacer" />
         </header>
         <EmptyState
-          icon={<ShieldIcon size={26} />}
-          title="Yeh khata ab nahi hai"
-          body="Shayad ise delete kar diya gaya hai. Aapke baaki log safe hain."
+          icon={<ShieldIcon size={24} />}
+          title="Person not found"
+          body="This person may have been deleted."
           action={
             <button type="button" className="btn btn-primary" onClick={() => navigate('people')}>
-              Sab log dekho
+              Back to people
             </button>
           }
         />
@@ -55,15 +55,17 @@ export function PersonDetailPage({ route }: { route: Route }) {
 
   const balance = balanceOf(person.id, txns);
   const firstName = person.name.split(' ')[0];
+  const isClear = Math.abs(balance) < 0.009;
+
   const settle = () => {
     const txn = settleUp(person.id);
-    if (txn) toast(`Hisaab clear — ${rupees(txn.amount)} ki entry ban gayi`);
-    else toast('Hisaab pehle se clear hai');
+    if (txn) toast(`Settled up · ${rupees(txn.amount)} recorded`);
+    else toast('Already settled up');
   };
 
   const remind = async () => {
-    if (!balance) {
-      toast('Hisaab clear hai, reminder ki zaroorat nahi');
+    if (isClear) {
+      toast('Nothing to settle');
       return;
     }
     const text = reminderText({
@@ -79,111 +81,87 @@ export function PersonDetailPage({ route }: { route: Route }) {
     if (!opened) {
       try {
         await navigator.clipboard.writeText(text);
-        toast('Message copy ho gaya — WhatsApp mein paste kar do');
+        toast('Message copied. Paste it in WhatsApp.');
       } catch {
-        toast('WhatsApp nahi khul paya. Phone mein number add karo.');
+        toast('Could not open WhatsApp. Add their phone number first.');
       }
     }
   };
 
   return (
     <div className="page page--person">
-      <header className="topbar topbar--compact">
-        <button type="button" className="icon-btn" onClick={() => navigate('people')} aria-label="Sab log">
+      <header className="topbar">
+        <button type="button" className="icon-btn" onClick={() => navigate('people')} aria-label="Back">
           <ChevronLeftIcon size={22} />
         </button>
-        <span className="topbar-center">Khata</span>
-        <button type="button" className="icon-btn" onClick={() => setEditOpen(true)} aria-label="Banda edit karo">
+        <span className="topbar-spacer" />
+        <button type="button" className="icon-btn" onClick={() => setEditOpen(true)} aria-label="Edit person">
           <EditIcon size={20} />
         </button>
       </header>
 
-      <section className={`person-hero ${balance > 0 ? 'is-out' : balance < 0 ? 'is-in' : 'is-clear'}`}>
-        <Avatar name={person.name} size={68} />
+      <section className={`person-hero ${balance > 0.009 ? 'is-pos' : balance < -0.009 ? 'is-neg' : 'is-clear'}`}>
+        <Avatar name={person.name} size={72} />
         <h1 className="person-name">{person.name}</h1>
-        {person.upi ? <p className="person-upi">{person.upi}</p> : <p className="person-upi muted">UPI add karo taaki pehchaan aasaan ho</p>}
-
+        {person.upi && <p className="person-upi">{person.upi}</p>}
         <div className="person-balance">
           <span className="person-balance-label">
-            {balance > 0 ? 'Aapko milenge' : balance < 0 ? 'Aapko dene hain' : 'Hisaab clear'}
+            {balance > 0.009 ? 'You are owed' : balance < -0.009 ? 'You owe' : 'Settled up'}
           </span>
-          <strong className="person-balance-value">{rupees(Math.abs(balance))}</strong>
+          {!isClear && <strong className="person-balance-value">{rupees(Math.abs(balance))}</strong>}
         </div>
-        <p className="person-balance-hint">
-          {balance > 0
-            ? `${firstName} aapko ${rupees(balance)} dega`
-            : balance < 0
-              ? `Aap ${firstName} ko ${rupees(Math.abs(balance))} denge`
-              : 'Sab barabar — koi hisaab baaki nahi'}
-        </p>
       </section>
 
       <div className="person-actions">
-        <button type="button" className="action-tile" onClick={() => setAddOpen(true)}>
-          <span className="action-icon action-icon--saffron">
-            <PlusIcon size={20} />
-          </span>
-          <span>Naya</span>
+        <button type="button" className="btn btn-primary grow" onClick={() => setAddOpen(true)}>
+          <PlusIcon size={18} /> Add expense
         </button>
-        <button type="button" className="action-tile" onClick={() => setSettleOpen(true)} disabled={!balance}>
-          <span className="action-icon action-icon--green">
-            <ArrowDownLeftIcon size={20} />
-          </span>
-          <span>Settle</span>
-        </button>
-        <button type="button" className="action-tile" onClick={remind}>
-          <span className="action-icon action-icon--whatsapp">
-            <WhatsAppIcon size={20} />
-          </span>
-          <span>Reminder</span>
+        <button type="button" className="btn btn-outline grow" onClick={() => setSettleOpen(true)} disabled={isClear}>
+          <CheckIcon size={18} /> Settle up
         </button>
       </div>
+      {!isClear && (
+        <button type="button" className="remind-link" onClick={remind}>
+          <WhatsAppIcon size={16} /> Send a reminder
+        </button>
+      )}
 
       <section className="section">
         <div className="section-head">
-          <h2>Hisaab ki kitaab</h2>
-          <span className="section-meta">{list.length} {list.length === 1 ? 'entry' : 'entries'}</span>
+          <h2>History</h2>
+          <span className="section-meta">
+            {list.length} {list.length === 1 ? 'entry' : 'entries'}
+          </span>
         </div>
 
         {groups.length ? (
           <div className="timeline timeline--tight">
-            {groups.map((g) => {
-              const net = g.items.reduce((a, t) => a + (t.direction === 'out' ? t.amount : -t.amount), 0);
-              return (
-                <div key={g.key} className="timeline-group">
-                  <div className="timeline-head">
-                    <h3>{dayLabel(g.date)}</h3>
-                    <span className="timeline-net">
-                      {net === 0 ? 'barabar' : `${net > 0 ? '+' : '−'}${rupees(Math.abs(net))}`}
-                    </span>
-                  </div>
-                  <div className="list-card">
-                    {g.items.map((t) => (
-                      <TxnRow key={t.id} txn={t} onClick={() => setActiveTxn(t)} />
-                    ))}
-                  </div>
+            {groups.map((g) => (
+              <div key={g.key} className="timeline-group">
+                <div className="timeline-head">
+                  <h3>{dayLabel(g.date)}</h3>
                 </div>
-              );
-            })}
+                <div className="card list-card">
+                  {g.items.map((t) => (
+                    <TxnRow key={t.id} txn={t} showDate={false} onClick={() => setActiveTxn(t)} />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <EmptyState
-            icon={<ArrowUpRightIcon size={26} />}
-            title="Khaata khaali hai"
-            body={`${firstName} ke saath pehla hisaab daalo — chai ho ya kiraya, sab chalta hai.`}
+            icon={<PlusIcon size={24} />}
+            title="No expenses yet"
+            body={`Add the first expense with ${firstName}.`}
             action={
               <button type="button" className="btn btn-primary" onClick={() => setAddOpen(true)}>
-                Pehla hisaab daalo
+                Add expense
               </button>
             }
           />
         )}
       </section>
-
-      <button type="button" className="whatsapp-wide" onClick={remind}>
-        <WhatsAppIcon size={20} />
-        {balance > 0 ? `${firstName} ko polite reminder bhejo` : balance < 0 ? 'Apna hisaab clear karne ka message' : 'Hisaab clear hai'}
-      </button>
 
       <TxnSheet open={addOpen} onClose={() => setAddOpen(false)} person={person} />
       <TxnSheet open={!!activeTxn} onClose={() => setActiveTxn(null)} txn={activeTxn} person={person} />
@@ -197,14 +175,14 @@ export function PersonDetailPage({ route }: { route: Route }) {
       <ConfirmSheet
         open={settleOpen}
         onClose={() => setSettleOpen(false)}
-        title="Poora hisaab clear karein?"
+        title="Settle up?"
         body={
           <p>
-            <strong>{rupees(Math.abs(balance))}</strong> ka settlement entry ban jaayega aur khata zero ho jaayega.
-            {balance > 0 ? ' Matlab unhone aapko paise de diye.' : ' Matlab aapne unhe paise de diye.'}
+            Record a payment of <strong>{rupees(Math.abs(balance))}</strong> and bring this balance to zero.
+            {balance > 0 ? ' This means they paid you.' : ' This means you paid them.'}
           </p>
         }
-        confirmLabel="Haan, clear karo"
+        confirmLabel="Settle up"
         onConfirm={settle}
       />
     </div>

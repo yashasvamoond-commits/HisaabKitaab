@@ -58,7 +58,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addPerson = useCallback((input: NewPersonInput): Person => {
     const person: Person = {
       id: newId('p_'),
-      name: input.name.trim() || 'Naya banda',
+      name: input.name.trim() || 'New person',
       aliases: input.aliases || [],
       upi: input.upi?.trim() || undefined,
       phone: input.phone?.trim() || undefined,
@@ -95,7 +95,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ? null
         : {
             id: newId('p_'),
-            name: (input.personName || 'Naya banda').trim(),
+            name: (input.personName || 'New person').trim(),
             aliases: [],
             color: 'clay',
             createdAt: new Date().toISOString(),
@@ -149,7 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         personId,
         direction: balance > 0 ? 'in' : 'out',
         amount: Math.abs(balance),
-        note: 'Poora hisaab clear',
+        note: 'Settled up',
         category: 'other',
         date: new Date().toISOString(),
         source: 'manual',
@@ -169,7 +169,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const finishOnboarding = useCallback((name: string) => {
     setState((s) => ({
       ...s,
-      profile: { ...s.profile, name: name.trim() || 'Aap' },
+      profile: { ...s.profile, name: name.trim() || 'You' },
       settings: { ...s.settings, onboarded: true },
     }));
   }, []);
@@ -185,7 +185,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const importState = useCallback((next: AppState) => {
     const safe: AppState = {
       version: 1,
-      profile: next.profile && typeof next.profile.name === 'string' ? next.profile : { name: 'Aap', createdAt: new Date().toISOString() },
+      profile: next.profile && typeof next.profile.name === 'string' ? next.profile : { name: 'You', createdAt: new Date().toISOString() },
       persons: Array.isArray(next.persons) ? next.persons : [],
       txns: Array.isArray(next.txns) ? next.txns : [],
       settings: {
