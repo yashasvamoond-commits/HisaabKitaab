@@ -1,6 +1,11 @@
 name: Publish permanent app link
 
 on:
+  push:
+    branches:
+      - arena/246c4b92-hisaabkitaab
+    paths:
+      - .github/workflows/publish.yml
   workflow_dispatch:
     inputs:
       slug:
