@@ -303,7 +303,13 @@ export function ScanPage({ route }: { route: Route }) {
   const displayName = selectedPerson?.name || personValue.name?.trim() || '';
   const previousBalance = selectedPerson ? balanceOf(selectedPerson.id, txns) : null;
   const nextBalance = previousBalance == null ? null : previousBalance + (direction === 'out' ? amount : -amount);
-  const confidence = draft && source !== 'manual' ? confidenceLabel(draft.confidence) : null;
+  const ready = amount > 0 && !!displayName;
+  const confidence =
+    draft && source !== 'manual'
+      ? ready
+        ? { text: 'Looks good', tone: 'pos' }
+        : confidenceLabel(Math.min(draft.confidence, 0.7))
+      : null;
   const suggestions = useMemo(() => (draft?.candidates || []).slice(0, 3), [draft]);
 
   const save = () => {
@@ -496,9 +502,15 @@ export function ScanPage({ route }: { route: Route }) {
             {amount > 0 && (
               <p className="hint-line">
                 {direction === 'out' ? (
-                  <>{displayName ? `${displayName} owes you` : "You'll be owed"} <strong>{rupees(amount)}</strong></>
+                  <>
+                    {displayName ? `${displayName} owes you` : "You'll be owed"} <strong>{rupees(amount)}</strong>
+                    {displayName ? ' for this entry' : ''}
+                  </>
                 ) : (
-                  <>{displayName ? `You owe ${displayName}` : "You'll owe"} <strong>{rupees(amount)}</strong></>
+                  <>
+                    {displayName ? `You owe ${displayName}` : "You'll owe"} <strong>{rupees(amount)}</strong>
+                    {displayName ? ' for this entry' : ''}
+                  </>
                 )}
               </p>
             )}

@@ -150,9 +150,15 @@ export function TxnSheet({
           {amount > 0 && (
             <p className="hint-line">
               {direction === 'out' ? (
-                <>{displayName ? `${who} owes you` : "You'll be owed"} <strong>{rupees(amount)}</strong></>
+                <>
+                  {displayName ? `${who} owes you` : "You'll be owed"} <strong>{rupees(amount)}</strong>
+                  {displayName ? ' for this entry' : ''}
+                </>
               ) : (
-                <>{displayName ? `You owe ${who}` : "You'll owe"} <strong>{rupees(amount)}</strong></>
+                <>
+                  {displayName ? `You owe ${who}` : "You'll owe"} <strong>{rupees(amount)}</strong>
+                  {displayName ? ' for this entry' : ''}
+                </>
               )}
             </p>
           )}
