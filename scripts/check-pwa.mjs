@@ -27,7 +27,18 @@ const installability = await cdp.send('Page.getInstallabilityErrors').catch((err
 const info = await page.evaluate(() => {
   const badge = [...document.querySelectorAll('a')].find((a) => /deed\.page/.test(a.href));
   const rect = badge?.getBoundingClientRect();
+  const tabbar = document.querySelector('.tabbar')?.getBoundingClientRect();
+  const overlapsTabbar = !!(
+    rect &&
+    tabbar &&
+    rect.left < tabbar.right &&
+    rect.right > tabbar.left &&
+    rect.top < tabbar.bottom &&
+    rect.bottom > tabbar.top
+  );
   return {
+    host: document.documentElement.dataset.host || '',
+    overlapsTabbar,
     title: document.title,
     hasServiceWorker: 'serviceWorker' in navigator,
     controlled: !!navigator.serviceWorker?.controller,

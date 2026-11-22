@@ -65,3 +65,5 @@ jobs:
           name: pwa-check
           path: /tmp/pwa-check.png
           if-no-files-found: ignore
+
+# publish trigger: host-aware tab bar + badge check

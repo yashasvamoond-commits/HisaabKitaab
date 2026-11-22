@@ -6,4 +6,4 @@ const note = (title, value) => console.log(`::notice title=${title}::${String(va
 note('Manifest errors', JSON.stringify(data.manifestErrors));
 note('Installability', JSON.stringify(data.installability));
 note('Badge', JSON.stringify(data.info?.badge));
-note('App boot', `${data.info?.title} | hero=${data.info?.hero} | sw=${data.info?.hasServiceWorker} | errors=${(data.errors || []).length}`);
+note('App boot', `${data.info?.title} | host=${data.info?.host} | overlapsBadge=${data.info?.overlapsTabbar} | sw=${data.info?.hasServiceWorker} | errors=${(data.errors || []).length}`);
