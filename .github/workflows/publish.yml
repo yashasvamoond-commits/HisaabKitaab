@@ -1,6 +1,12 @@
 name: Publish permanent app link
 
 on:
+  push:
+    branches:
+      - arena/fdb7adeb-hisaabkitaab
+    paths:
+      - .github/workflows/publish.yml
+      - deed-publish-trigger
   workflow_dispatch:
     inputs:
       slug:
@@ -11,6 +17,9 @@ on:
 
 permissions:
   contents: read
+
+env:
+  SLUG: ${{ inputs.slug || 'hisaabkitaab' }}
 
 jobs:
   publish:
@@ -31,7 +40,7 @@ jobs:
       - name: Publish to deed.page
         run: |
           curl -fsSL https://deed.page/cli/publish-large.mjs -o publish-large.mjs
-          node publish-large.mjs ./dist --slug "${{ inputs.slug }}" --client "Arena Agent" | tee publish-url.txt
+          node publish-large.mjs ./dist --slug "$SLUG" --client "Arena Agent" | tee publish-url.txt
           URL=$(tail -n 1 publish-url.txt)
           echo "::notice title=HisaabKitaab live link::$URL"
           for path in "" "manifest.webmanifest" "sw.js" "index.html"; do
