@@ -1,0 +1,40 @@
+name: Publish permanent app link
+
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: 'Public link name (letters, numbers, hyphen)'
+        required: true
+        default: 'hisaabkitaab'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Check size
+        run: |
+          BYTES=$(du -sb dist | cut -f1)
+          echo "dist is $BYTES bytes"
+          test "$BYTES" -lt 25000000
+      - name: Publish to deed.page
+        run: |
+          curl -fsSL https://deed.page/cli/publish-large.mjs -o publish-large.mjs
+          node publish-large.mjs ./dist --slug "${{ inputs.slug }}" --client "Arena Agent" | tee publish-url.txt
+          URL=$(tail -n 1 publish-url.txt)
+          echo "::notice title=HisaabKitaab live link::$URL"
+          for path in "" "manifest.webmanifest" "sw.js" "index.html"; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "${URL}${path}")
+            echo "::notice title=Check /${path}::${STATUS}"
+          done
