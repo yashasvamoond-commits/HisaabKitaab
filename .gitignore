@@ -1,0 +1,8 @@
+node_modules
+dist
+node_modules/.vite
+public/ocr
+*.local
+.DS_Store
+android/
+*.tsbuildinfo
