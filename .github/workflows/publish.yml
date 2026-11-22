@@ -41,10 +41,21 @@ jobs:
         with:
           path: ~/.config/deed-page
           key: deed-page-token-v1
+      - name: Check publish token
+        run: |
+          FILES=$(find ~/.config/deed-page -type f 2>/dev/null | wc -l | tr -d ' ')
+          echo "::notice title=Publish token::${FILES} file(s) restored"
       - name: Publish to deed.page
         run: |
           curl -fsSL https://deed.page/cli/publish-large.mjs -o publish-large.mjs
-          node publish-large.mjs ./dist --slug "$SLUG" --client "Arena Agent" | tee publish-url.txt
+          set +e
+          node publish-large.mjs ./dist --slug "$SLUG" --client "Arena Agent" 2>&1 | tee publish-url.txt
+          CODE=${PIPESTATUS[0]}
+          set -e
+          if [ "$CODE" -ne 0 ]; then
+            echo "::error title=Publish error::$(tail -c 700 publish-url.txt | tr '\n' ' ')"
+            exit "$CODE"
+          fi
           URL=$(tail -n 1 publish-url.txt)
           echo "::notice title=HisaabKitaab live link::$URL"
           for path in "" "manifest.json" "sw.js" "index.html" "ocr/core/tesseract-core-simd-lstm.wasm" "ocr/lang/eng.traineddata.gz"; do
