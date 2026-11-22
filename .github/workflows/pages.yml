@@ -27,12 +27,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Enable GitHub Pages (first run only)
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh api -X POST "repos/${{ github.repository }}/pages" -f build_type=workflow
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
