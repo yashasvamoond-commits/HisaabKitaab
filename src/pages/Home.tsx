@@ -82,8 +82,12 @@ export function HomePage() {
           )}
         </h2>
         <p className="hero-sub">
-          {openCount > 0 ? `${openCount} logon ke saath hisaab baaki` : 'Sab clear hai — mast!'}
-          {flow.people > 0 ? ` · ${flow.people} log jude` : ''}
+          {openCount > 0
+            ? openCount === 1
+              ? '1 bande ke saath hisaab baaki'
+              : `${openCount} logon ke saath hisaab baaki`
+            : 'Sab clear hai — mast!'}
+          {flow.people > 0 ? ` · ${flow.people} ${flow.people === 1 ? 'log juda' : 'log jude'}` : ''}
         </p>
         <div className="hero-split">
           <div className="hero-split-item">
