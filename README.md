@@ -6,6 +6,18 @@ Bhejo screenshot, chat ya bank SMS — naam, amount aur kisne diya, sab khud sam
 
 Built as an installable PWA: **one link, works on iPhone and Android**, no Play Store, no App Store, no login. Everything stays on the phone.
 
+## Open the app
+
+**<https://hisaabkitaab-app.deed.page/>**
+
+<p align="center">
+  <a href="https://hisaabkitaab-app.deed.page/"><img src="docs/install-qr.png" width="150" alt="Scan to open HisaabKitaab" /></a>
+</p>
+
+On **Android**, open the link and tap **Install** in the app's banner (or ⋮ → Install app). On **iPhone/iPad**, open it in Safari → **Share** → **Add to Home Screen**. After that it opens full-screen, works offline, and keeps all data on the phone.
+
+> The free public hosting shows a small “Published with deed.page” badge below the app's controls. It does not cover the app or affect installing/offline use.
+
 <p align="center">
   <img src="docs/screens/home.png" width="250" alt="Home — kul hisaab and khata list" />
   <img src="docs/screens/review.png" width="250" alt="Screenshot review — parsed amount, person, old → new balance" />
@@ -54,7 +66,7 @@ Built as an installable PWA: **one link, works on iPhone and Android**, no Play 
 
 ## Install it like an app (one tap)
 
-Deploy the built `dist/` folder to any HTTPS static host (Netlify, Vercel, Cloudflare Pages, GitHub Pages, S3). Then:
+The live app is already deployed. To run your own copy, deploy the built `dist/` folder to any HTTPS static host (Netlify, Vercel, Cloudflare Pages, GitHub Pages, S3), then:
 
 - **Android (Chrome)** → open the link → tap **Install** in the in-app banner, or menu **⋮ → Install app**.
 - **iPhone / iPad (Safari)** → open the link → **Share** → **Add to Home Screen**.

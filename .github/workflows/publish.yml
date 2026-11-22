@@ -1,12 +1,6 @@
 name: Publish permanent app link
 
 on:
-  push:
-    branches:
-      - arena/fdb7adeb-hisaabkitaab
-    paths:
-      - .github/workflows/publish.yml
-      - deed-publish-trigger
   workflow_dispatch:
     inputs:
       slug:
@@ -73,5 +67,3 @@ jobs:
           if-no-files-found: ignore
 
 # publish trigger: host-aware tab bar + badge check
-
-# publish trigger: live OCR verification
